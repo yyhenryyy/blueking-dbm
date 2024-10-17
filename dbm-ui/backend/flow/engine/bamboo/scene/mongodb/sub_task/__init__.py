@@ -12,6 +12,7 @@ specific language governing permissions and limitations under the License.
 
 from .cluster_enable_disable import cluster_enable_disable
 from .cluster_increase_node import cluster_increase_node
+from .cluster_monogs_autofix import mongos_autofix
 from .cluster_reduce_node import cluster_reduce_node
 from .cluster_replace import cluster_replace
 from .cluster_scale import cluster_scale
@@ -19,6 +20,7 @@ from .deinstall import deinstall
 from .exec_script import exec_script
 from .increase_mongod import increase_mongod
 from .increase_mongos import increase_mongos
+from .instance_deinstall import instance_deinstall
 from .instance_restart import instance_restart
 from .mongod_replace import mongod_replace
 from .mongos_install import mongos_install
