@@ -102,8 +102,10 @@ def generate_autofix_ticket(fault_clusters: QuerySet):
                 cluster.immute_domain, redis_proxies, redis_slaves
             )
         )
+        if mongos_list or mongod_list:
+            mongo_create_ticket(cluster, cluster_ids, mongos_list, mongod_list)
+            return
         create_ticket(cluster, cluster_ids, redis_proxies, redis_slaves)
-        mongo_create_ticket(cluster, cluster_ids, mongos_list, mongod_list)
 
 
 def create_ticket(cluster: RedisAutofixCore, cluster_ids: list, redis_proxies: list, redis_slaves: list):
