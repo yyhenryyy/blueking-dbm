@@ -56,7 +56,7 @@ def mongo_create_ticket(cluster: RedisAutofixCore, cluster_ids: list, mongos_lis
 
     # 获取dba
     try:
-        mongodb_dba = DBAdministrator.objects.get(bk_biz_id=cluster.bk_biz_id, db_type=DBType.MongoDB.value)
+        mongodb_dba = DBAdministrator.objects.get(bk_biz_id=cluster.bk_biz_id, db_type=DBType.MongoDB.value).users
     except DBAdministrator.DoesNotExist:
         # 如果不存在，则取默认值
         mongodb_dba = DBAdministrator.objects.get(bk_biz_id=0, db_type=DBType.MongoDB.value)
