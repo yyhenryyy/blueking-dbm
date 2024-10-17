@@ -64,7 +64,7 @@ def generate_autofix_ticket(fault_clusters: QuerySet):
                 "spec_id": fault_obj.spec_id,
                 "bk_sub_zone": fault_obj.bk_sub_zone,
                 "bk_sub_zone_id": fault_obj.bk_sub_zone_id,
-                "city": fault_obj.bk_city.logical_city,
+                "city": fault_obj.bk_city.logical_city.name,
                 "instance_type": fault_machine["instance_type"],
                 "spec_config": fault_obj.spec_config,
                 "cluster_type": cluster.cluster_type,
