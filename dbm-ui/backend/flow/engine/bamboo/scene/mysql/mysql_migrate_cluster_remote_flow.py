@@ -20,7 +20,8 @@ from django.utils.translation import ugettext as _
 from backend.components import DBConfigApi
 from backend.components.dbconfig.constants import FormatType, LevelName
 from backend.configuration.constants import DBType
-from backend.db_meta.enums import ClusterType, InstanceInnerRole
+from backend.constants import IP_PORT_DIVIDER
+from backend.db_meta.enums import ClusterType, InstanceInnerRole, InstanceStatus
 from backend.db_meta.models import Cluster
 from backend.db_package.models import Package
 from backend.db_services.mysql.fixpoint_rollback.handlers import FixPointRollbackHandler
@@ -33,6 +34,9 @@ from backend.flow.engine.bamboo.scene.mysql.common.common_sub_flow import (
 )
 from backend.flow.engine.bamboo.scene.mysql.common.get_master_config import get_instance_config
 from backend.flow.engine.bamboo.scene.mysql.common.master_and_slave_switch import master_and_slave_switch
+from backend.flow.engine.bamboo.scene.mysql.common.mysql_resotre_data_sub_flow import (
+    mysql_restore_master_slave_sub_flow,
+)
 from backend.flow.engine.bamboo.scene.mysql.common.uninstall_instance import uninstall_instance_sub_flow
 from backend.flow.engine.bamboo.scene.spider.common.exceptions import TendbGetBackupInfoFailedException
 from backend.flow.engine.bamboo.scene.spider.spider_remote_node_migrate import remote_instance_migrate_sub_flow
@@ -53,6 +57,7 @@ from backend.flow.utils.mysql.mysql_act_dataclass import (
 from backend.flow.utils.mysql.mysql_act_playload import MysqlActPayload
 from backend.flow.utils.mysql.mysql_context_dataclass import ClusterInfoContext
 from backend.flow.utils.mysql.mysql_db_meta import MySQLDBMeta
+from backend.ticket.builders.common.constants import MySQLBackupSource
 
 logger = logging.getLogger("flow")
 
@@ -74,6 +79,9 @@ class MySQLMigrateClusterRemoteFlow(object):
 
         # 定义备份文件存放到目标机器目录位置
         self.backup_target_path = f"/data/dbbak/{self.root_id}"
+        self.local_backup = False
+        if self.ticket_data.get("backup_source") == MySQLBackupSource.LOCAL:
+            self.local_backup = True
 
     def migrate_cluster_flow(self, use_for_upgrade=False):
         """
@@ -234,18 +242,42 @@ class MySQLMigrateClusterRemoteFlow(object):
                 cluster["slave_ip"] = self.data["slave_ip"]
                 cluster["master_port"] = master_model.port
                 cluster["slave_port"] = master_model.port
+                cluster["mysql_port"] = master_model.port
                 cluster["file_target_path"] = f"/data/dbbak/{self.root_id}/{master_model.port}"
                 cluster["cluster_id"] = cluster_model.id
                 cluster["bk_cloud_id"] = cluster_model.bk_cloud_id
                 cluster["change_master_force"] = False
+                cluster["change_master"] = False
                 cluster["charset"] = self.data["charset"]
 
                 sync_data_sub_pipeline = SubBuilder(root_id=self.root_id, data=copy.deepcopy(self.data))
-                sync_data_sub_pipeline.add_sub_pipeline(
-                    sub_flow=remote_instance_migrate_sub_flow(
-                        root_id=self.root_id, ticket_data=copy.deepcopy(self.data), cluster_info=cluster
+                if self.local_backup:
+                    stand_by_slaves = cluster_model.storageinstance_set.filter(
+                        instance_inner_role=InstanceInnerRole.SLAVE.value,
+                        is_stand_by=True,
+                        status=InstanceStatus.RUNNING.value,
+                    ).exclude(machine__ip__in=[self.data["new_slave_ip"], self.data["new_master_ip"]])
+                    #     从standby从库找备份
+                    inst_list = ["{}{}{}".format(master_model.machine.ip, IP_PORT_DIVIDER, master_model.port)]
+                    if len(stand_by_slaves) > 0:
+                        inst_list.append(
+                            "{}{}{}".format(stand_by_slaves[0].machine.ip, IP_PORT_DIVIDER, stand_by_slaves[0].port)
+                        )
+                    sync_data_sub_pipeline.add_sub_pipeline(
+                        sub_flow=mysql_restore_master_slave_sub_flow(
+                            root_id=self.root_id,
+                            ticket_data=copy.deepcopy(self.data),
+                            cluster=cluster,
+                            cluster_model=cluster_model,
+                            ins_list=inst_list,
+                        )
                     )
-                )
+                else:
+                    sync_data_sub_pipeline.add_sub_pipeline(
+                        sub_flow=remote_instance_migrate_sub_flow(
+                            root_id=self.root_id, ticket_data=copy.deepcopy(self.data), cluster_info=cluster
+                        )
+                    )
 
                 sync_data_sub_pipeline.add_act(
                     act_name=_("数据恢复完毕,写入新主节点和旧主节点的关系链元数据"),
@@ -297,7 +329,7 @@ class MySQLMigrateClusterRemoteFlow(object):
                     )
                 )
                 switch_sub_pipeline.add_act(
-                    act_name=_("集群切换完成,写入 {} 的元信息".format(cluster_model.id)),
+                    act_name=_("集群切换完成,写入 {} 的元信息".format(cluster_model.name)),
                     act_component_code=MySQLDBMetaComponent.code,
                     kwargs=asdict(
                         DBMetaOPKwargs(
@@ -308,11 +340,13 @@ class MySQLMigrateClusterRemoteFlow(object):
                     ),
                 )
                 switch_sub_pipeline_list.append(
-                    switch_sub_pipeline.build_sub_process(sub_name=_("集群 {} 切换".format(cluster_model.id)))
+                    switch_sub_pipeline.build_sub_process(sub_name=_("集群 {} 切换".format(cluster_model.name)))
                 )
             # 第四步 卸载实例
             uninstall_svr_sub_pipeline_list = []
+            uninstall_surrounding_sub_pipeline_list = []
             for ip in [self.data["slave_ip"], self.data["master_ip"]]:
+                uninstall_surrounding_sub_pipeline = SubBuilder(root_id=self.root_id, data=copy.deepcopy(self.data))
                 uninstall_svr_sub_pipeline = SubBuilder(root_id=self.root_id, data=copy.deepcopy(self.data))
                 # 考虑到部分实例成对迁移的情况(即拆分)
                 cluster = {
@@ -322,7 +356,7 @@ class MySQLMigrateClusterRemoteFlow(object):
                     "bk_cloud_id": cluster_class.bk_cloud_id,
                 }
 
-                uninstall_svr_sub_pipeline.add_act(
+                uninstall_surrounding_sub_pipeline.add_act(
                     act_name=_("下发db-actor到节点{}".format(ip)),
                     act_component_code=TransFileComponent.code,
                     kwargs=asdict(
@@ -334,7 +368,7 @@ class MySQLMigrateClusterRemoteFlow(object):
                     ),
                 )
 
-                uninstall_svr_sub_pipeline.add_act(
+                uninstall_surrounding_sub_pipeline.add_act(
                     act_name=_("清理实例级别周边配置"),
                     act_component_code=ExecuteDBActuatorScriptComponent.code,
                     kwargs=asdict(
@@ -381,10 +415,13 @@ class MySQLMigrateClusterRemoteFlow(object):
                         root_id=self.root_id, ticket_data=copy.deepcopy(self.data), ip=ip, ports=self.data["ports"]
                     )
                 )
+
+                uninstall_surrounding_sub_pipeline_list.append(
+                    uninstall_surrounding_sub_pipeline.build_sub_process(sub_name=_("卸载remote节点周边{}".format(ip)))
+                )
                 uninstall_svr_sub_pipeline_list.append(
                     uninstall_svr_sub_pipeline.build_sub_process(sub_name=_("卸载remote节点{}".format(ip)))
                 )
-
             # 安装实例
             tendb_migrate_pipeline.add_parallel_sub_pipeline(sub_flow_list=install_sub_pipeline_list)
             # 同步配置
@@ -405,6 +442,18 @@ class MySQLMigrateClusterRemoteFlow(object):
                     db_backup_pkg_type=MysqlVersionToDBBackupForMap[self.data["db_version"]],
                 )
             )
+            # tendb_migrate_pipeline.add_act(
+            #     act_name=_("屏蔽监控 {} {}").format(self.data["new_master_ip"], self.data["new_slave_ip"]),
+            #     act_component_code=MysqlCrondMonitorControlComponent.code,
+            #     kwargs=asdict(
+            #         CrondMonitorKwargs(
+            #             bk_cloud_id=cluster_class.bk_cloud_id,
+            #             exec_ips=[self.data["new_master_ip"], self.data["new_slave_ip"]],
+            #             port=0,
+            #             minutes=240,
+            #         )
+            #     ),
+            # )
             # 人工确认切换迁移实例
             tendb_migrate_pipeline.add_act(act_name=_("人工确认切换"), act_component_code=PauseComponent.code, kwargs={})
             # 切换迁移实例
@@ -450,6 +499,7 @@ class MySQLMigrateClusterRemoteFlow(object):
                         )
                     ),
                 )
+            tendb_migrate_pipeline.add_parallel_sub_pipeline(sub_flow_list=uninstall_surrounding_sub_pipeline_list)
             # 卸载流程人工确认
             tendb_migrate_pipeline.add_act(act_name=_("人工确认卸载实例"), act_component_code=PauseComponent.code, kwargs={})
             # 卸载remote节点

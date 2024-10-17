@@ -29,7 +29,7 @@
   import { useI18n } from 'vue-i18n';
 
   import { checkMysqlInstances } from '@services/source/instances';
-  import type { InstanceInfos } from '@services/types/clusters';
+  import type { InstanceInfos } from '@services/types';
 
   import { useGlobalBizs } from '@stores';
 
@@ -142,9 +142,16 @@
         ip: item.ip,
         bk_cloud_id: item.bk_cloud_id,
       });
-      return editRef.value.getValue().then(() => ({
-        master: formatHost(localProxyData),
-      }));
+      return editRef.value
+        .getValue()
+        .then(() => ({
+          master: formatHost(localProxyData),
+        }))
+        .catch(() =>
+          Promise.reject({
+            master: props.modelValue,
+          }),
+        );
     },
   });
 </script>

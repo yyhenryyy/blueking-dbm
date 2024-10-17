@@ -27,7 +27,7 @@
   import { useI18n } from 'vue-i18n';
 
   import { checkMysqlInstances } from '@services/source/instances';
-  import type { InstanceInfos } from '@services/types/clusters';
+  import type { InstanceInfos } from '@services/types';
 
   import { useGlobalBizs } from '@stores';
 
@@ -35,10 +35,10 @@
 
   import { random } from '@utils';
 
-  import type { IDataRow, IProxyData } from './Row.vue';
+  import type { IDataRow } from './Row.vue';
 
   interface Props {
-    modelValue?: IProxyData;
+    modelValue?: IDataRow['target'];
     source: IDataRow['source'];
   }
 
@@ -115,7 +115,7 @@
     () => props.modelValue,
     () => {
       if (props.modelValue) {
-        localInstanceAddress.value = props.modelValue.instance_address;
+        localInstanceAddress.value = props.modelValue;
 
         instanceAddreddMemo[instanceKey][localInstanceAddress.value] = true;
       }
@@ -128,9 +128,16 @@
   defineExpose<Exposes>({
     getValue() {
       // 用户输入未完成验证
-      return editRef.value.getValue().then(() => ({
-        target: localInstanceAddress.value,
-      }));
+      return editRef.value
+        .getValue()
+        .then(() => ({
+          target: localInstanceAddress.value,
+        }))
+        .catch(() =>
+          Promise.reject({
+            target: localInstanceAddress.value,
+          }),
+        );
     },
   });
 </script>

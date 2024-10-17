@@ -24,16 +24,17 @@
           :data="item"
           :removeable="tableData.length < 2"
           @add="(payload: Array<IDataRow>) => handleAppend(index, payload)"
+          @clone="(payload: IDataRow) => handleClone(index, payload)"
           @host-input-finish="(ip: string) => handleChangeHostIp(index, ip)"
           @remove="handleRemove(index)" />
       </RenderData>
       <BkForm
-        class="mt-24"
+        class="toolbox-form mt-24"
         form-type="vertical">
         <BkFormItem
           :label="t('备份源')"
           required>
-          <BkRadioGroup v-model="backupSource">
+          <BkRadioGroup v-model="formData.backup_source">
             <BkRadio label="local">
               {{ t('本地备份') }}
             </BkRadio>
@@ -43,6 +44,7 @@
           </BkRadioGroup>
         </BkFormItem>
       </BkForm>
+      <TicketRemark v-model="formData.remark" />
     </div>
     <template #action>
       <BkButton
@@ -73,10 +75,17 @@
   </SmartAction>
 </template>
 
+<script lang="tsx">
+  export const createDefaultFormData = () => ({
+    backup_source: 'local',
+    remark: '',
+  });
+</script>
 <script setup lang="tsx">
+  import type { UnwrapRef } from 'vue';
   import { useI18n } from 'vue-i18n';
 
-  import { getSpiderMachineList } from '@services/source/spider';
+  import { getTendbclusterMachineList } from '@services/source/tendbcluster';
   import { createTicket } from '@services/source/ticket';
 
   import { useGlobalBizs } from '@stores';
@@ -88,11 +97,21 @@
     type IValue,
     type PanelListType,
   } from '@components/instance-selector/Index.vue';
+  import TicketRemark from '@components/ticket-remark/Index.vue';
 
   import { random } from '@utils';
 
   import RenderData from './components/render-data/Index.vue';
   import RenderDataRow, { createRowData, type IDataRow } from './components/render-data/Row.vue';
+
+  interface Props {
+    ticketCloneData?: {
+      tableDataList: IDataRow[];
+      formData: UnwrapRef<typeof formData>;
+    };
+  }
+
+  const props = defineProps<Props>();
 
   const { t } = useI18n();
   const router = useRouter();
@@ -100,9 +119,10 @@
 
   const isShowInstanceSelecotr = ref(false);
   const rowRefs = ref([] as InstanceType<typeof RenderDataRow>[]);
-  const backupSource = ref('local');
   const isSubmitting = ref(false);
   const tableData = ref<Array<IDataRow>>([createRowData()]);
+
+  const formData = reactive(createDefaultFormData());
 
   const selected = shallowRef({ TendbClusterHost: [] } as InstanceSelectorValues<IValue>);
 
@@ -133,6 +153,16 @@
   let ipMemo = {} as Record<string, boolean>;
 
   const totalNum = computed(() => tableData.value.filter((item) => Boolean(item.oldSlave?.ip)).length);
+
+  watch(
+    () => props.ticketCloneData,
+    () => {
+      if (props.ticketCloneData) {
+        tableData.value = props.ticketCloneData.tableDataList;
+        Object.assign(formData, props.ticketCloneData.formData);
+      }
+    },
+  );
 
   // 检测列表是否为空
   const checkListEmpty = (list: Array<IDataRow>) => {
@@ -190,7 +220,7 @@
       return;
     }
     tableData.value[index].isLoading = true;
-    const spiderMachineResult = await getSpiderMachineList({
+    const spiderMachineResult = await getTendbclusterMachineList({
       ip,
       instance_role: 'remote_slave',
     }).finally(() => {
@@ -236,6 +266,16 @@
     tableData.value = dataList;
   };
 
+  // 复制行数据
+  const handleClone = (index: number, sourceData: IDataRow) => {
+    const dataList = [...tableData.value];
+    dataList.splice(index + 1, 0, sourceData);
+    tableData.value = dataList;
+    setTimeout(() => {
+      rowRefs.value[rowRefs.value.length - 1].getValue();
+    });
+  };
+
   const handleSubmit = async () => {
     try {
       isSubmitting.value = true;
@@ -245,7 +285,7 @@
         remark: '',
         details: {
           ip_source: 'resource_pool',
-          backup_source: backupSource.value,
+          backup_source: formData.backup_source,
           infos,
         },
         bk_biz_id: currentBizId,
@@ -268,6 +308,7 @@
   };
 
   const handleReset = () => {
+    Object.assign(formData, createDefaultFormData());
     tableData.value = [createRowData()];
     ipMemo = {};
     selected.value.TendbClusterHost = [];

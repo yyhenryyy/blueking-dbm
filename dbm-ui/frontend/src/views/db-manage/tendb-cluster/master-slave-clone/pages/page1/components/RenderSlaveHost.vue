@@ -26,7 +26,7 @@
   import { useI18n } from 'vue-i18n';
   import { useRequest } from 'vue-request';
 
-  import RemotePairInstanceModel from '@services/model/mysql-cluster/remote-pair-instance';
+  import RemotePairInstanceModel from '@services/model/mysql/remote-pair-instance';
   import { getRemoteMachineInstancePair } from '@services/source/mysqlCluster';
 
   import RenderText from '@components/render-table/columns/text-plain/index.vue';
@@ -70,6 +70,10 @@
       const [machineInstancePair] = Object.values(data.machines);
       slaveInfo.value = machineInstancePair;
       emits('change', machineInstancePair.ip);
+      setTimeout(() => {
+        // 行复制后，查询到对应数据后消除验证失败的样式
+        textRef.value.getValue();
+      });
     },
   });
 

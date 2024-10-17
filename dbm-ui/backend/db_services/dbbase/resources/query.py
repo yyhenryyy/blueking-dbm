@@ -400,31 +400,21 @@ class ListRetrieveResource(BaseListRetrieveResource):
         # 一join多的一方会有重复的数据,去重
         cluster_queryset = Cluster.objects.filter(query_filters).distinct()
 
-        def filter_inst_queryset(_cluster_queryset, _proxy_queryset, _storage_queryset, _filters):
-            # 注意这里用新的变量获取过滤后的queryset，不要用原queryset过滤，会影响后续集群关联实例的获取
-            _proxy_filter_queryset = _proxy_queryset.filter(_filters)
-            _storage_filter_queryset = _storage_queryset.filter(_filters)
-            # 这里如果不用distinct，会查询出重复记录。TODO: 排查查询重复记录的原因
-            _cluster_queryset = _cluster_queryset.filter(
-                Q(proxyinstance__in=_proxy_filter_queryset) | Q(storageinstance__in=_storage_filter_queryset)
-            ).distinct()
-            return _cluster_queryset
-
         # 实例筛选
         def filter_instance_func(_query_params, _cluster_queryset, _proxy_queryset, _storage_queryset):
             """实例过滤ip:port 以及 ip 两种情况"""
-            # 应用过滤条件并返回查询集
-            _cluster_queryset = filter_inst_queryset(
-                _cluster_queryset, _proxy_queryset, _storage_queryset, build_q_for_instance_filter(_query_params)
-            )
-
+            # 注意这里用新的变量获取过滤后的queryset，不要用原queryset过滤，会影响后续集群关联实例的获取
+            _filters = build_q_for_instance_filter(_query_params)
+            _proxy_filter_qs, _storage_filter_qs = _proxy_queryset.filter(_filters), _storage_queryset.filter(_filters)
+            _cluster_queryset = _cluster_queryset.filter(
+                Q(proxyinstance__in=_proxy_filter_qs) | Q(storageinstance__in=_storage_filter_qs)
+            ).distinct()
             return _cluster_queryset
 
+        inner_filter_func_map = {"instance": filter_instance_func}
         filter_func_map = filter_func_map or {}
-        filter_func_map = {
-            "instance": filter_instance_func,
-            **filter_func_map,
-        }
+        filter_func_map.update(inner_filter_func_map)
+
         # 通过基础过滤函数进行cluster过滤
         for params in filter_func_map:
             if params in query_params:
@@ -471,10 +461,13 @@ class ListRetrieveResource(BaseListRetrieveResource):
         cluster_queryset = cluster_queryset[offset : limit + offset].prefetch_related(
             Prefetch("proxyinstance_set", queryset=proxy_queryset.select_related("machine"), to_attr="proxies"),
             Prefetch("storageinstance_set", queryset=storage_queryset.select_related("machine"), to_attr="storages"),
+            Prefetch("nosqlstoragesetdtl_set", to_attr="storage_set_dtl"),
             Prefetch("clusterentry_set", to_attr="entries"),
             "tag_set",
         )
-        cluster_ids = list(cluster_queryset.values_list("id", flat=True))
+        # 由于对 queryset 切片工作方式的模糊性，这里的values可能会获得非预期的排序，所以不要在切片后用values
+        # cluster_ids = list(cluster_queryset.values_list("id", flat=True))
+        cluster_ids = [c.id for c in cluster_queryset]
 
         # 获取集群与访问入口的映射
         cluster_entry_map = ClusterEntry.get_cluster_entry_map(cluster_ids)
@@ -536,6 +529,18 @@ class ListRetrieveResource(BaseListRetrieveResource):
         """
         cluster_entry_map_value = cluster_entry_map.get(cluster.id, {})
         bk_cloud_name = cloud_info.get(str(cluster.bk_cloud_id), {}).get("bk_cloud_name", "")
+
+        machine_list = [
+            (storage_set_dtl.seg_range, f"{storage_set_dtl.instance.machine.ip}:{storage_set_dtl.instance.port}")
+            for storage_set_dtl in cluster.storage_set_dtl
+        ]
+        machine_map = {}
+        for group_name, machine_ip_port in machine_list:
+            if not machine_map.get(group_name):
+                machine_map[group_name] = [machine_ip_port]
+            else:
+                machine_map[group_name].append(machine_ip_port)
+
         return {
             "id": cluster.id,
             "phase": cluster.phase,
@@ -558,6 +563,7 @@ class ListRetrieveResource(BaseListRetrieveResource):
             "bk_cloud_name": bk_cloud_name,
             "major_version": cluster.major_version,
             "region": cluster.region,
+            "seg_range": machine_map,
             "db_module_name": db_module_names_map.get(cluster.db_module_id, ""),
             "db_module_id": cluster.db_module_id,
             "creator": cluster.creator,
@@ -885,8 +891,9 @@ class ListRetrieveResource(BaseListRetrieveResource):
         # 获取machine关联的集群信息，目前一个实例只关联一个集群
         related_clusters_map: Dict[int, List[Dict]] = {}
         for inst in [*list(machine.storageinstance_set.all()), *list(machine.proxyinstance_set.all())]:
-            cluster = inst.cluster.all()[0]
-            related_clusters_map[cluster.id] = cluster.to_dict()
+            cluster = inst.cluster.first()
+            if cluster:
+                related_clusters_map[cluster.id] = cluster.to_dict()
 
         return {
             "instance_role": instance_role,

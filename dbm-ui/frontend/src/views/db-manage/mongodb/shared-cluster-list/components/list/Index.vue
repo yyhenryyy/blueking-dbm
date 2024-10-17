@@ -102,6 +102,7 @@
 
 <script setup lang="tsx">
   import { InfoBox, Message } from 'bkui-vue';
+  import type { ISearchItem } from 'bkui-vue/lib/search-select/utils';
   import { useI18n } from 'vue-i18n';
 
   import MongodbModel from '@services/model/mongodb/mongodb';
@@ -129,22 +130,22 @@
     UserPersonalSettings,
   } from '@common/const';
 
-  import ClusterAuthorize from '@components/cluster-authorize/ClusterAuthorize.vue';
-  import ClusterCapacityUsageRate from '@components/cluster-capacity-usage-rate/Index.vue'
-  import ExcelAuthorize from '@components/cluster-common/ExcelAuthorize.vue';
-  import OperationBtnStatusTips from '@components/cluster-common/OperationBtnStatusTips.vue';
-  import RenderOperationTag from '@components/cluster-common/RenderOperationTag.vue';
-  import RenderClusterStatus from '@components/cluster-common/RenderStatus.vue';
+  import RenderClusterStatus from '@components/cluster-status/Index.vue';
   import DbTable from '@components/db-table/index.vue';
-  import DropdownExportExcel from '@components/dropdown-export-excel/index.vue';
   import MiniTag from '@components/mini-tag/index.vue';
-  import RenderInstances from '@components/render-instances/RenderInstances.vue';
   import RenderTextEllipsisOneLine from '@components/text-ellipsis-one-line/index.vue';
   import TextOverflowLayout from '@components/text-overflow-layout/Index.vue';
 
+  import ClusterAuthorize from '@views/db-manage/common/cluster-authorize/ClusterAuthorize.vue';
+  import ClusterCapacityUsageRate from '@views/db-manage/common/cluster-capacity-usage-rate/Index.vue'
   import ClusterIpCopy from '@views/db-manage/common/cluster-ip-copy/Index.vue';
+  import DropdownExportExcel from '@views/db-manage/common/dropdown-export-excel/index.vue';
+  import ExcelAuthorize from '@views/db-manage/common/ExcelAuthorize.vue';
+  import OperationBtnStatusTips from '@views/db-manage/common/OperationBtnStatusTips.vue';
   import RenderCellCopy from '@views/db-manage/common/render-cell-copy/Index.vue';
   import RenderHeadCopy from '@views/db-manage/common/render-head-copy/Index.vue';
+  import RenderInstances from '@views/db-manage/common/render-instances/RenderInstances.vue';
+  import RenderOperationTag from '@views/db-manage/common/RenderOperationTag.vue';
 
   import {
     getMenuListSearch,
@@ -153,11 +154,6 @@
 
   import { useDisableCluster } from '../../hooks/useDisableCluster';
   import CapacityChange from '../components/CapacityChange.vue';
-
-  import type {
-    SearchSelectData,
-    SearchSelectItem,
-  } from '@/types/bkui-vue';
 
   const clusterId = defineModel<number>('clusterId');
 
@@ -262,7 +258,7 @@
       multiple: true,
       children: searchAttrs.value.time_zone,
     },
-  ] as SearchSelectData);
+  ]);
 
   const tableRef = ref<InstanceType<typeof DbTable>>();
   const capacityChangeShow = ref(false);
@@ -680,7 +676,7 @@
     updateTableSettings,
   } = useTableSettings(UserPersonalSettings.MONGODB_SHARED_CLUSTER_SETTINGS, defaultSettings);
 
-  const getMenuList = async (item: SearchSelectItem | undefined, keyword: string) => {
+  const getMenuList = async (item: ISearchItem | undefined, keyword: string) => {
     if (item?.id !== 'creator' && keyword) {
       return getMenuListSearch(item, keyword, searchSelectData.value, searchValue.value);
     }

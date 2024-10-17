@@ -100,7 +100,7 @@
   import { useI18n } from 'vue-i18n';
   import { useRequest } from 'vue-request';
 
-  import SqlserverPermissionAccountModel from '@services/model/sqlserver-permission/sqlserver-permission-account';
+  import SqlserverPermissionAccountModel from '@services/model/sqlserver/sqlserver-permission-account';
   import {
     deleteSqlserverAccount,
     getSqlserverPermissionRules,
@@ -108,9 +108,10 @@
 
   import { AccountTypes, ClusterTypes } from '@common/const';
 
-  import ClusterAuthorize from '@components/cluster-authorize/ClusterAuthorize.vue';
   import DbTable from '@components/db-table/index.vue';
   import TextOverflowLayout from '@components/text-overflow-layout/Index.vue';
+
+  import ClusterAuthorize from '@views/db-manage/common/cluster-authorize/ClusterAuthorize.vue';
 
   import { getSearchSelectorParams , messageSuccess } from '@utils';
 

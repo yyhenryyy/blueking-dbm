@@ -12,7 +12,7 @@
 -->
 
 <template>
-  <div class="mysql-ha-cluster-list">
+  <div class="mysql-ha-cluster-list-page">
     <div class="operation-box">
       <AuthButton
         v-db-console="'mysql.haClusterList.instanceApply'"
@@ -100,10 +100,6 @@
   <ExcelAuthorize
     v-model:is-show="isShowExcelAuthorize"
     :cluster-type="ClusterTypes.TENDBHA" />
-  <EditEntryConfig
-    :id="showEnterConfigClusterId"
-    v-model:is-show="showEditEntryConfig"
-    :get-detail-info="getTendbhaDetail" />
   <CreateSubscribeRuleSlider
     v-model="showCreateSubscribeRuleSlider"
     :selected-clusters="selectedClusterList"
@@ -146,28 +142,29 @@
   import {
     AccountTypes,
     ClusterTypes,
+    DBTypes,
     TicketTypes,
     type TicketTypesStrings,
     UserPersonalSettings,
   } from '@common/const';
 
-  import ClusterAuthorize from '@components/cluster-authorize/ClusterAuthorize.vue';
-  import ClusterCapacityUsageRate from '@components/cluster-capacity-usage-rate/Index.vue'
-  import ExcelAuthorize from '@components/cluster-common/ExcelAuthorize.vue';
-  import OperationBtnStatusTips from '@components/cluster-common/OperationBtnStatusTips.vue';
-  import RenderOperationTag from '@components/cluster-common/RenderOperationTag.vue';
-  import EditEntryConfig from '@components/cluster-entry-config/Index.vue';
-  import ClusterExportData from '@components/cluster-export-data/Index.vue'
   import DbStatus from '@components/db-status/index.vue';
   import DbTable from '@components/db-table/index.vue';
-  import DropdownExportExcel from '@components/dropdown-export-excel/index.vue';
   import MoreActionExtend from '@components/more-action-extend/Index.vue';
-  import RenderInstances from '@components/render-instances/RenderInstances.vue';
   import TextOverflowLayout from '@components/text-overflow-layout/Index.vue';
 
+  import ClusterAuthorize from '@views/db-manage/common/cluster-authorize/ClusterAuthorize.vue';
+  import ClusterCapacityUsageRate from '@views/db-manage/common/cluster-capacity-usage-rate/Index.vue'
+  import EditEntryConfig, { type RowData } from '@views/db-manage/common/cluster-entry-config/Index.vue';
+  import ClusterExportData from '@views/db-manage/common/cluster-export-data/Index.vue'
   import ClusterIpCopy from '@views/db-manage/common/cluster-ip-copy/Index.vue';
+  import DropdownExportExcel from '@views/db-manage/common/dropdown-export-excel/index.vue';
+  import ExcelAuthorize from '@views/db-manage/common/ExcelAuthorize.vue';
+  import OperationBtnStatusTips from '@views/db-manage/common/OperationBtnStatusTips.vue';
   import RenderCellCopy from '@views/db-manage/common/render-cell-copy/Index.vue';
   import RenderHeadCopy from '@views/db-manage/common/render-head-copy/Index.vue';
+  import RenderInstances from '@views/db-manage/common/render-instances/RenderInstances.vue';
+  import RenderOperationTag from '@views/db-manage/common/RenderOperationTag.vue';
   import CreateSubscribeRuleSlider from '@views/db-manage/mysql/dumper/components/create-rule/Index.vue';
 
   import {
@@ -175,6 +172,8 @@
     getSearchSelectorParams,
     isRecentDays,
   } from '@utils';
+
+  import RenderEntries from './RenderEntries.vue';
 
   interface ColumnData {
     cell: string,
@@ -237,12 +236,10 @@
   const tableRef = ref<InstanceType<typeof DbTable>>();
   const isShowExcelAuthorize = ref(false);
   const isInit = ref(false);
-  const showEditEntryConfig = ref(false);
-  const showEnterConfigClusterId = ref(0);
   const showCreateSubscribeRuleSlider = ref(false);
   const showDataExportSlider = ref(false)
   const selectedClusterList = ref<ColumnData['data'][]>([]);
-  const currentData = ref<ColumnData['data']>()
+  const currentData = ref<ColumnData['data']>();
 
   const selected = ref<TendbhaModel[]>([])
   /** 集群授权 */
@@ -337,6 +334,24 @@
     return funControllerStore.funControllerData.mysql.children[currentKey];
   });
 
+
+  const renderEntry = (data: RowData) => {
+    if (data.role === 'master_entry') {
+      return (
+        <span>
+          <bk-tag size="small" theme="success">{ t('主') }</bk-tag>{ data.entry }
+        </span>
+      )
+    }
+    return (
+      <span>
+        <bk-tag size="small" theme="info">{ t('从') }</bk-tag>{ data.entry }
+      </span>
+    )
+  }
+
+  const entrySort = (data: RowData[]) => data.sort(a => a.role === 'master_entry' ? -1 : 1);
+
   const columns = computed(() => [
     {
       label: 'ID',
@@ -400,17 +415,16 @@
                     }
                   ]
                 } />
-                <auth-button
-                  v-bk-tooltips={t('修改入口配置')}
-                  v-db-console="mysql.haClusterList.modifyEntryConfiguration"
-                  action-id="access_entry_edit"
-                  resource="mysql"
-                  permission={data.permission.access_entry_edit}
-                  text
-                  theme="primary"
-                  onClick={() => handleOpenEntryConfig(data)}>
-                  <db-icon type="edit" />
-                </auth-button>
+                <span v-db-console="mysql.haClusterList.modifyEntryConfiguration">
+                  <EditEntryConfig
+                    id={data.id}
+                    getDetailInfo={getTendbhaDetail}
+                    permission={data.permission.access_entry_edit}
+                    resource={DBTypes.MYSQL}
+                    renderEntry={renderEntry}
+                    sort={entrySort}
+                    onSuccess={fetchData} />
+                </span>
               </>
             ),
           }}
@@ -463,10 +477,16 @@
                       data-text="NEW" />
                   )
                 }
-                <db-icon
-                  v-bk-tooltips={t('复制集群名称')}
-                  type="copy"
-                  onClick={() => copy(data.cluster_name)} />
+                <span v-db-console="mysql.haClusterList.modifyEntryConfiguration">
+                  <EditEntryConfig
+                    id={data.id}
+                    getDetailInfo={getTendbhaDetail}
+                    permission={data.permission.access_entry_edit}
+                    resource={DBTypes.MYSQL}
+                    renderEntry={renderEntry}
+                    sort={entrySort}
+                    onSuccess={fetchData} />
+                </span>
               </>
             ),
           }}
@@ -515,8 +535,8 @@
     {
       label: t('从访问入口'),
       field: 'slave_domain',
-      minWidth: 200,
-      width: 220,
+      minWidth: 280,
+      width: 280,
       showOverflowTooltip: false,
       renderHead: () => (
         <RenderHeadCopy
@@ -539,40 +559,35 @@
           {t('从访问入口')}
         </RenderHeadCopy>
       ),
-      render: ({ data }: ColumnData) => (
-        <TextOverflowLayout>
-          {{
-            default: () => data.slaveDomainDisplayName || '--',
-            append: () => (
-              <>
-                <RenderCellCopy copyItems={
-                  [
-                    {
-                      value: data.slave_domain,
-                      label: t('域名')
-                    },
-                    {
-                      value: data.slaveDomainDisplayName,
-                      label: t('域名:端口')
-                    }
-                  ]
-                } />
-                <auth-button
-                  v-bk-tooltips={t('修改入口配置')}
-                  v-db-console="mysql.haClusterList.modifyEntryConfiguration"
-                  action-id="access_entry_edit"
-                  resource="mysql"
+      render: ({ data }: ColumnData) => <RenderEntries data={data.slaveEntryList}>
+        {{
+          append: ({ index }: { index: number }) => index === 0 && (
+            <>
+              <RenderCellCopy copyItems={
+                [
+                  {
+                    value: data.slave_domain,
+                    label: t('域名')
+                  },
+                  {
+                    value: data.slaveDomainDisplayName,
+                    label: t('域名:端口')
+                  }
+                ]
+              } />
+              <span v-db-console="mysql.haClusterList.modifyEntryConfiguration">
+                <EditEntryConfig
+                  id={data.id}
+                  getDetailInfo={getTendbhaDetail}
                   permission={data.permission.access_entry_edit}
-                  text
-                  theme="primary"
-                  onClick={() => handleOpenEntryConfig(data)}>
-                  <db-icon type="edit" />
-                </auth-button>
-              </>
-            )
-          }}
-        </TextOverflowLayout>
-      ),
+                  resource={DBTypes.MYSQL}
+                  renderEntry={renderEntry}
+                  sort={entrySort}
+                  onSuccess={fetchData} />
+              </span>
+            </>)
+        }}
+        </RenderEntries>
     },
     {
       label: 'Proxy',
@@ -685,7 +700,12 @@
           role="slave"
           clusterId={data.id}
           dataSource={getTendbhaInstanceList}
-        />
+        >
+          {{
+            append: ({ data: instance }: { data: TendbhaModel['slaves'][number] }) =>
+              data.slaves.length > 1 && instance.is_stand_by && (<bk-tag class="is-stand-by" size="small">Standby</bk-tag>)
+          }}
+        </RenderInstances>
       ),
     },
     {
@@ -955,11 +975,6 @@
     handleCopy(allData as T[], field)
   }
 
-  const handleOpenEntryConfig = (row: TendbhaModel) => {
-    showEditEntryConfig.value  = true;
-    showEnterConfigClusterId.value = row.id;
-  };
-
   const handleSelection = (data: TendbhaModel, list: TendbhaModel[]) => {
     selected.value = list;
     selectedClusterList.value = list;
@@ -1103,7 +1118,7 @@
 <style lang="less" scoped>
   @import '@styles/mixins.less';
 
-  .mysql-ha-cluster-list {
+  .mysql-ha-cluster-list-page {
     height: 100%;
     padding: 24px 0;
     margin: 0 24px;
@@ -1155,31 +1170,22 @@
         }
       }
 
+      .slave-entry {
+        line-height: 22px;
+      }
+
+      .is-stand-by {
+        color: #531dab !important;
+        background: #f9f0ff !important;
+      }
+
       .db-icon-copy,
-      .db-icon-edit {
+      .db-icon-visible1 {
         display: none;
         margin-top: 1px;
         margin-left: 4px;
         color: @primary-color;
         cursor: pointer;
-      }
-
-      .table-wrapper {
-        background-color: white;
-
-        .bk-table {
-          height: 100% !important;
-        }
-
-        :deep(.bk-table-body) {
-          max-height: calc(100% - 100px);
-        }
-      }
-
-      .is-shrink-table {
-        :deep(.bk-table-body) {
-          overflow: hidden auto;
-        }
       }
 
       :deep(.cluster-name-container) {
@@ -1218,7 +1224,7 @@
 
     :deep(td:hover) {
       .db-icon-copy,
-      .db-icon-edit {
+      .db-icon-visible1 {
         display: inline-block !important;
       }
     }

@@ -40,10 +40,10 @@ class SQLServerRollbackHandler(object):
         @param end_time: 查询结束时间
         @param dbname: 查询db
         """
-        # 单独获取最后一个binlog
+        # 单独获取最后一个binlog, 加1秒为了保证获取比时间点大于的日志备份
         last_binlogs = self._get_log_from_bklog(
             collector="mssql_binlog_result",
-            start_time=end_time,
+            start_time=end_time + timedelta(seconds=1),
             end_time=end_time + timedelta(days=BACKUP_LOG_RANGE_DAYS),
             query_string=f"""cluster_id: {self.cluster.id} AND dbname: "{dbname}" """,
             size=1,
@@ -55,7 +55,7 @@ class SQLServerRollbackHandler(object):
         binlogs = self._get_log_from_bklog(
             collector="mssql_binlog_result",
             start_time=start_time,
-            end_time=end_time,
+            end_time=end_time + timedelta(seconds=1),
             query_string=f"""cluster_id: {self.cluster.id} AND dbname: "{dbname}" """,
         )
         # TODO: binlog是否需要聚合 or 转义
@@ -160,6 +160,7 @@ class SQLServerRollbackHandler(object):
     def query_last_log_time(self, query_time: datetime):
         """
         查询集群的最近一次上报的备份时间
+        拿最新的一条备份记录的备份开始时间的作为判断依据
         """
         last_binlogs = self._get_log_from_bklog(
             collector="mssql_binlog_result",
@@ -172,7 +173,7 @@ class SQLServerRollbackHandler(object):
         if not last_binlogs:
             raise Exception(_("集群【{}】最近的{}天里找不到日志备份").format(self.cluster.name, BACKUP_LOG_RANGE_DAYS))
 
-        return last_binlogs[0]["backup_end_time"]
+        return last_binlogs[0]["backup_task_start_time"]
 
     @staticmethod
     def check_binlog_lsn_continuity(backup_logs: List[Dict], full_backup_info: Dict) -> (List[Dict], List[str]):

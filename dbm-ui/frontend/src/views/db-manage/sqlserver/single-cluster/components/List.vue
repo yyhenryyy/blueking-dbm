@@ -71,10 +71,6 @@
     v-model:is-show="isShowExcelAuthorize"
     :cluster-type="ClusterTypes.SQLSERVER_SINGLE"
     :ticket-type="TicketTypes.SQLSERVER_EXCEL_AUTHORIZE_RULES" />
-  <EditEntryConfig
-    :id="showEnterConfigClusterId"
-    v-model:is-show="showEditEntryConfig"
-    :get-detail-info="getSingleClusterDetail" />
   <ClusterReset
     v-if="currentData"
     v-model:is-show="isShowClusterReset"
@@ -83,6 +79,7 @@
 
 <script setup lang="tsx">
   import { InfoBox, Message } from 'bkui-vue';
+  import type { ISearchItem } from 'bkui-vue/lib/search-select/utils';
   import { useI18n } from 'vue-i18n';
   import { useRequest } from 'vue-request';
   import {
@@ -90,7 +87,7 @@
     useRouter,
   } from 'vue-router';
 
-  import SqlServerSingleClusterModel from '@services/model/sqlserver/sqlserver-single-cluster';
+  import SqlServerSingleModel from '@services/model/sqlserver/sqlserver-single';
   import {
     getSingleClusterDetail,
     getSingleClusterList,
@@ -112,26 +109,27 @@
   import {
     AccountTypes,
     ClusterTypes,
+    DBTypes,
     TicketTypes,
     type TicketTypesStrings,
     UserPersonalSettings,
   } from '@common/const';
 
-  import ClusterAuthorize from '@components/cluster-authorize/ClusterAuthorize.vue';
-  import ClusterCapacityUsageRate from '@components/cluster-capacity-usage-rate/Index.vue'
-  import ExcelAuthorize from '@components/cluster-common/ExcelAuthorize.vue';
-  import OperationBtnStatusTips from '@components/cluster-common/OperationBtnStatusTips.vue';
-  import RenderOperationTag from '@components/cluster-common/RenderOperationTag.vue';
-  import RenderClusterStatus from '@components/cluster-common/RenderStatus.vue';
-  import EditEntryConfig from '@components/cluster-entry-config/Index.vue';
+  import RenderClusterStatus from '@components/cluster-status/Index.vue';
   import DbTable from '@components/db-table/index.vue';
-  import DropdownExportExcel from '@components/dropdown-export-excel/index.vue';
-  import RenderInstances from '@components/render-instances/RenderInstances.vue';
   import TextOverflowLayout from '@components/text-overflow-layout/Index.vue';
 
+  import ClusterAuthorize from '@views/db-manage/common/cluster-authorize/ClusterAuthorize.vue';
+  import ClusterCapacityUsageRate from '@views/db-manage/common/cluster-capacity-usage-rate/Index.vue'
+  import EditEntryConfig from '@views/db-manage/common/cluster-entry-config/Index.vue';
   import ClusterIpCopy from '@views/db-manage/common/cluster-ip-copy/Index.vue';
+  import DropdownExportExcel from '@views/db-manage/common/dropdown-export-excel/index.vue';
+  import ExcelAuthorize from '@views/db-manage/common/ExcelAuthorize.vue';
+  import OperationBtnStatusTips from '@views/db-manage/common/OperationBtnStatusTips.vue';
   import RenderCellCopy from '@views/db-manage/common/render-cell-copy/Index.vue';
   import RenderHeadCopy from '@views/db-manage/common/render-head-copy/Index.vue';
+  import RenderInstances from '@views/db-manage/common/render-instances/RenderInstances.vue';
+  import RenderOperationTag from '@views/db-manage/common/RenderOperationTag.vue';
   import ClusterReset from '@views/db-manage/sqlserver/components/cluster-reset/Index.vue'
 
   import {
@@ -139,11 +137,6 @@
     getSearchSelectorParams,
     isRecentDays,
   } from '@utils';
-
-  import type {
-    SearchSelectData,
-    SearchSelectItem,
-  } from '@/types/bkui-vue';
 
   const singleClusterData = defineModel<{ clusterId: number }>('singleClusterData');
 
@@ -195,10 +188,8 @@
   const tableRef = ref<InstanceType<typeof DbTable>>();
   const isShowExcelAuthorize = ref(false);
   const isShowClusterReset = ref(false)
-  const showEditEntryConfig = ref(false);
-  const showEnterConfigClusterId = ref(0);
-  const currentData = ref<SqlServerSingleClusterModel>()
-  const selected = ref<SqlServerSingleClusterModel[]>([])
+  const currentData = ref<SqlServerSingleModel>()
+  const selected = ref<SqlServerSingleModel[]>([])
 
   /** 集群授权 */
   const authorizeShow = ref(false);
@@ -282,7 +273,7 @@
       multiple: true,
       children: searchAttrs.value.time_zone,
     },
-  ] as SearchSelectData);
+  ]);
 
   const tableOperationWidth = computed(() => {
     if (!isStretchLayoutOpen.value) {
@@ -325,16 +316,19 @@
           {t('访问入口')}
         </RenderHeadCopy>
       ),
-      render: ({ data }: { data: SqlServerSingleClusterModel }) => (
+      render: ({ data }: { data: SqlServerSingleModel }) => (
         <TextOverflowLayout>
           {{
             default: () => (
-              <bk-button
+              <auth-button
+                action-id="sqlserver_view"
+                permission={data.permission.sqlserver_view}
+                resource-id={data.id}
                 text
                 theme="primary"
                 onClick={() => handleToDetails(data)}>
                 {data.master_domain}
-              </bk-button>
+              </auth-button>
             ),
             append: () => (
               <>
@@ -364,14 +358,14 @@
                       data-text="NEW" />
                   )
                 }
-                <bk-button
-                  v-bk-tooltips={t('修改入口配置')}
-                  class="ml-4"
-                  text
-                  theme="primary"
-                  onClick={() => handleOpenEntryConfig(data)}>
-                  <db-icon type="edit" />
-                </bk-button>
+                <span v-db-console="sqlserver.singleClusterList.modifyEntryConfiguration">
+                  <EditEntryConfig
+                    id={data.id}
+                    getDetailInfo={getSingleClusterDetail}
+                    permission={data.permission.access_entry_edit}
+                    resource={DBTypes.SQLSERVER}
+                    onSuccess={fetchData} />
+                </span>
               </>
             ),
           }}
@@ -400,7 +394,7 @@
           {t('集群名称')}
         </RenderHeadCopy>
       ),
-      render: ({ data }: { data: SqlServerSingleClusterModel }) => (
+      render: ({ data }: { data: SqlServerSingleModel }) => (
         <TextOverflowLayout>
           {{
             default: () => data.cluster_name,
@@ -443,7 +437,7 @@
         checked: columnCheckedMap.value.bk_cloud_id,
       },
       width: 90,
-      render: ({ data }: { data: SqlServerSingleClusterModel }) => <span>{data.bk_cloud_name || '--'}</span>,
+      render: ({ data }: { data: SqlServerSingleModel }) => <span>{data.bk_cloud_name || '--'}</span>,
     },
     {
       label: t('状态'),
@@ -462,14 +456,14 @@
         ],
         checked: columnCheckedMap.value.status,
       },
-      render: ({ data }: { data: SqlServerSingleClusterModel }) => <RenderClusterStatus data={data.status} />,
+      render: ({ data }: { data: SqlServerSingleModel }) => <RenderClusterStatus data={data.status} />,
     },
     {
       label: t('容量使用率'),
       field: 'cluster_stats',
       width: 240,
       showOverflowTooltip: false,
-      render: ({ data }: { data: SqlServerSingleClusterModel }) => <ClusterCapacityUsageRate clusterStats={data.cluster_stats} />
+      render: ({ data }: { data: SqlServerSingleModel }) => <ClusterCapacityUsageRate clusterStats={data.cluster_stats} />
     },
     {
       label: t('实例'),
@@ -498,7 +492,7 @@
           {t('实例')}
         </RenderHeadCopy>
       ),
-      render: ({ data }: { data: SqlServerSingleClusterModel }) => (
+      render: ({ data }: { data: SqlServerSingleModel }) => (
         <RenderInstances
           highlightIps={batchSearchIpInatanceList.value}
           data={data.storages}
@@ -518,7 +512,7 @@
         list: columnAttrs.value.db_module_id,
         checked: columnCheckedMap.value.db_module_id,
       },
-      render: ({ data }: { data: SqlServerSingleClusterModel }) => <span>{data.db_module_name || '--'}</span>,
+      render: ({ data }: { data: SqlServerSingleModel }) => <span>{data.db_module_name || '--'}</span>,
     },
     {
       label: t('版本'),
@@ -529,7 +523,7 @@
         list: columnAttrs.value.major_version,
         checked: columnCheckedMap.value.major_version,
       },
-      render: ({ data }: { data: SqlServerSingleClusterModel }) => <span>{data.major_version || '--'}</span>,
+      render: ({ data }: { data: SqlServerSingleModel }) => <span>{data.major_version || '--'}</span>,
     },
     {
       label: t('地域'),
@@ -540,20 +534,20 @@
         list: columnAttrs.value.region,
         checked: columnCheckedMap.value.region,
       },
-      render: ({ data }: { data: SqlServerSingleClusterModel }) => <span>{data.region || '--'}</span>,
+      render: ({ data }: { data: SqlServerSingleModel }) => <span>{data.region || '--'}</span>,
     },
     {
       label: t('创建人'),
       field: 'creator',
       width: 140,
-      render: ({ data }: { data: SqlServerSingleClusterModel }) => <span>{data.creator || '--'}</span>,
+      render: ({ data }: { data: SqlServerSingleModel }) => <span>{data.creator || '--'}</span>,
     },
     {
       label: t('部署时间'),
       field: 'create_at',
       width: 160,
       sort: true,
-      render: ({ data }: { data: SqlServerSingleClusterModel }) => <span>{data.createAtDisplay || '--'}</span>,
+      render: ({ data }: { data: SqlServerSingleModel }) => <span>{data.createAtDisplay || '--'}</span>,
     },
     {
       label: t('时区'),
@@ -563,14 +557,14 @@
         list: columnAttrs.value.time_zone,
         checked: columnCheckedMap.value.time_zone,
       },
-      render: ({ data }: { data: SqlServerSingleClusterModel }) => <span>{data.cluster_time_zone || '--'}</span>,
+      render: ({ data }: { data: SqlServerSingleModel }) => <span>{data.cluster_time_zone || '--'}</span>,
     },
     {
       label: t('操作'),
       field: '',
       width: tableOperationWidth.value,
       fixed: isStretchLayoutOpen.value ? false : 'right',
-      render: ({ data }: { data: SqlServerSingleClusterModel }) => (
+      render: ({ data }: { data: SqlServerSingleModel }) => (
         <>
           {
             data.isOnline ? (
@@ -665,7 +659,7 @@
     },
   });
 
-  const getMenuList = async (item: SearchSelectItem | undefined, keyword: string) => {
+  const getMenuList = async (item: ISearchItem | undefined, keyword: string) => {
     if (item?.id !== 'creator' && keyword) {
       return getMenuListSearch(item, keyword, searchSelectData.value, searchValue.value);
     }
@@ -699,7 +693,7 @@
    */
   const handleSwitchCluster = (
     type: TicketTypesStrings,
-    data: SqlServerSingleClusterModel,
+    data: SqlServerSingleModel,
   ) => {
     if (!type) return;
 
@@ -734,7 +728,7 @@
   /**
    * 删除集群
    */
-  const handleDeleteCluster = (data: SqlServerSingleClusterModel) => {
+  const handleDeleteCluster = (data: SqlServerSingleModel) => {
     const { cluster_name: name } = data;
     InfoBox({
       type: 'warning',
@@ -762,7 +756,7 @@
     });
   };
 
-  const handleResetCluster = (data: SqlServerSingleClusterModel) => {
+  const handleResetCluster = (data: SqlServerSingleModel) => {
     currentData.value = data
     isShowClusterReset.value = true
   }
@@ -793,18 +787,13 @@
     copy(copyList.join('\n'));
   }
 
-  const handleOpenEntryConfig = (row: SqlServerSingleClusterModel) => {
-    showEditEntryConfig.value  = true;
-    showEnterConfigClusterId.value = row.id;
-  };
-
   // 获取列表数据下的实例子列表
-  const getInstanceListByRole = (dataList: SqlServerSingleClusterModel[], field: keyof SqlServerSingleClusterModel) => dataList.reduce((result, curRow) => {
-    result.push(...curRow[field] as SqlServerSingleClusterModel['storages']);
+  const getInstanceListByRole = (dataList: SqlServerSingleModel[], field: keyof SqlServerSingleModel) => dataList.reduce((result, curRow) => {
+    result.push(...curRow[field] as SqlServerSingleModel['storages']);
     return result;
-  }, [] as SqlServerSingleClusterModel['storages']);
+  }, [] as SqlServerSingleModel['storages']);
 
-  const handleCopySelected = <T,>(field: keyof T, role?: keyof SqlServerSingleClusterModel) => {
+  const handleCopySelected = <T,>(field: keyof T, role?: keyof SqlServerSingleModel) => {
     if(role) {
       handleCopy(getInstanceListByRole(selected.value, role) as T[], field)
       return;
@@ -812,8 +801,8 @@
     handleCopy(selected.value as T[], field)
   }
 
-  const handleCopyAll = async <T,>(field: keyof T, role?: keyof SqlServerSingleClusterModel) => {
-    const allData = await tableRef.value!.getAllData<SqlServerSingleClusterModel>();
+  const handleCopyAll = async <T,>(field: keyof T, role?: keyof SqlServerSingleModel) => {
+    const allData = await tableRef.value!.getAllData<SqlServerSingleModel>();
     if(allData.length === 0) {
       Message({
         theme: 'primary',
@@ -829,7 +818,7 @@
   }
 
   // 设置行样式
-  const setRowClass = (row: SqlServerSingleClusterModel) => {
+  const setRowClass = (row: SqlServerSingleModel) => {
     const classStack = [];
     if (row.isNew) {
       classStack.push('is-new-row');
@@ -840,8 +829,8 @@
     return classStack.join(' ');
   };
 
-  const handleSelection = (key: number[], list: Record<number, SqlServerSingleClusterModel>[]) => {
-    selected.value = list as unknown as SqlServerSingleClusterModel[];
+  const handleSelection = (key: number[], list: Record<number, SqlServerSingleModel>[]) => {
+    selected.value = list as unknown as SqlServerSingleModel[];
   };
 
   const handleClearSelected = () => {
@@ -862,7 +851,7 @@
    * 查看详情
    */
   const handleToDetails = (
-    data: SqlServerSingleClusterModel,
+    data: SqlServerSingleModel,
     isAllSpread: boolean = false,
   ) => {
     stretchLayoutSplitScreen();
@@ -911,7 +900,7 @@
 
       .db-icon-copy,
       .db-icon-link,
-      .db-icon-edit {
+      .db-icon-visible1 {
         display: none;
         margin-left: 4px;
         color: @primary-color;
@@ -937,7 +926,7 @@
     td:hover {
       .db-icon-copy,
       .db-icon-link,
-      .db-icon-edit {
+      .db-icon-visible1 {
         display: inline-block !important;
       }
     }

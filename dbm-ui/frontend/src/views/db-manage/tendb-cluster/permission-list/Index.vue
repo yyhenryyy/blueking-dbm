@@ -57,14 +57,13 @@
 
   import { AccountTypes, ClusterTypes } from '@common/const';
 
-  import ClusterAuthorize from '@components/cluster-authorize/ClusterAuthorize.vue';
+  import ClusterAuthorize from '@views/db-manage/common/cluster-authorize/ClusterAuthorize.vue';
 
   import { dbOperations } from '../permission/common/consts';
 
   import ExcelAuthorize from './components/ExcelAuthorize.vue';
 
   import { useGlobalBizs } from '@/stores';
-  import type { TableProps } from '@/types/bkui-vue';
 
   const tableSearch = ref([]);
   const authorizeShow = ref(false);
@@ -80,7 +79,7 @@
   });
 
   const keyword = ref('');
-  const columns: TableProps['columns'] = [
+  const columns = [
     {
       label: t('账号'),
       field: 'user',

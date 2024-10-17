@@ -25,7 +25,7 @@
   import { onBeforeUnmount, ref, watch } from 'vue';
   import { useI18n } from 'vue-i18n';
 
-  import type TendbClusterModel from '@services/model/spider/tendbCluster';
+  import type TendbClusterModel from '@services/model/tendbcluster/tendbcluster';
   import { filterClusters } from '@services/source/dbbase';
 
   import { useGlobalBizs } from '@stores';
@@ -112,7 +112,7 @@
     modelValue,
     () => {
       if (modelValue.value) {
-        clusterIdMemo[instanceKey][modelValue.value.id] = true;
+        clusterIdMemo[instanceKey] = { [modelValue.value.id]: true };
       }
     },
     {
@@ -126,16 +126,9 @@
 
   defineExpose<Exposes>({
     getValue() {
-      return editRef.value
-        .getValue()
-        .then(() => ({
-          cluster_id: modelValue.value!.id,
-        }))
-        .catch(() =>
-          Promise.reject({
-            cluster_id: modelValue.value?.id,
-          }),
-        );
+      return editRef.value.getValue().then(() => ({
+        cluster_id: modelValue.value!.id,
+      }));
     },
   });
 </script>

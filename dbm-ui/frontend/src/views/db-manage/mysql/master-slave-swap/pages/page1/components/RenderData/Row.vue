@@ -28,24 +28,28 @@
     <td style="padding: 0">
       <RenderCluster
         ref="clusterRef"
-        :master-data="localMasterData"
+        :data="localMasterData"
         @change="handleClusterChange" />
     </td>
     <OperateColumn
       :removeable="removeable"
+      show-clone
       @add="handleAppend"
+      @clone="handleClone"
       @remove="handleRemove" />
   </tr>
 </template>
 <script lang="ts">
   import { ref, shallowRef, watch } from 'vue';
+  import type { ComponentExposed } from 'vue-component-type-helpers';
 
   import FixedColumn from '@components/render-table/columns/fixed-column/index.vue';
   import OperateColumn from '@components/render-table/columns/operate-column/index.vue';
 
+  import RenderCluster from '@views/db-manage/common/RenderRelatedClusters.vue';
+
   import { random } from '@utils';
 
-  import RenderCluster from './RenderCluster.vue';
   import RenderMaster from './RenderMaster.vue';
   import RenderHost from './RenderSlave.vue';
 
@@ -81,6 +85,7 @@
   interface Emits {
     (e: 'add', params: Array<IDataRow>): void;
     (e: 'remove'): void;
+    (e: 'clone', value: IDataRow): void;
   }
 
   interface Exposes {
@@ -91,9 +96,9 @@
 
   const emits = defineEmits<Emits>();
 
-  const masterHostRef = ref();
-  const slaveHostRef = ref();
-  const clusterRef = ref();
+  const masterHostRef = ref<InstanceType<typeof RenderMaster>>();
+  const slaveHostRef = ref<InstanceType<typeof RenderHost>>();
+  const clusterRef = ref<ComponentExposed<typeof RenderCluster>>();
 
   const localMasterData = ref<IHostData>();
   const localSlaveData = ref<IHostData>();
@@ -131,12 +136,31 @@
     emits('remove');
   };
 
+  const getRowData = () => [
+    masterHostRef.value!.getValue(),
+    slaveHostRef.value!.getValue(),
+    clusterRef.value!.getValue(),
+  ];
+
+  const handleClone = () => {
+    Promise.allSettled(getRowData()).then((rowData) => {
+      const rowInfo = rowData.map((item) => (item.status === 'fulfilled' ? item.value : item.reason));
+      emits(
+        'clone',
+        createRowData({
+          slaveData: rowInfo[1].slave_ip,
+          masterData: props.data.masterData,
+        }),
+      );
+    });
+  };
+
   defineExpose<Exposes>({
     getValue() {
       return Promise.all([
-        masterHostRef.value.getValue('master_ip'),
-        slaveHostRef.value.getValue(),
-        clusterRef.value.getValue(),
+        masterHostRef.value!.getValue(),
+        slaveHostRef.value!.getValue(),
+        clusterRef.value!.getValue(),
       ]).then(([masterHostData, slaveHostData, clusterData]) => ({
         ...masterHostData,
         ...slaveHostData,

@@ -36,28 +36,75 @@
           true-value="TENDBCLUSTER_RESTORE_SLAVE" />
       </div>
     </div>
-    <Component :is="renderCom" />
+    <Component
+      :is="renderCom"
+      :ticket-clone-data="ticketCloneData" />
   </div>
 </template>
 
 <script setup lang="tsx">
   import { useI18n } from 'vue-i18n';
 
+  import { useTicketCloneInfo } from '@hooks';
+
+  import { TicketTypes } from '@common/const';
+
   import CardCheckbox from '@components/db-card-checkbox/CardCheckbox.vue';
 
-  import NewHost from './components/new-host/Index.vue';
-  import OriginalHost from './components/original-host/Index.vue';
+  import { createRowData as createNewHostRowData } from './components/new-host/components/render-data/Row.vue';
+  import NewHost, { createDefaultFormData as createNewHostFormData } from './components/new-host/Index.vue';
+  import { createRowData as createOriginHostRowData } from './components/original-host/components/RenderData/Row.vue';
+  import OriginalHost, {
+    createDefaultFormData as createOriginalHostFormData,
+  } from './components/original-host/Index.vue';
 
   const { t } = useI18n();
 
+  // 单据克隆
+  useTicketCloneInfo({
+    type: TicketTypes.TENDBCLUSTER_RESTORE_LOCAL_SLAVE,
+    onSuccess(cloneData) {
+      ticketCloneData.value = cloneData;
+      ticketType.value = TicketTypes.TENDBCLUSTER_RESTORE_LOCAL_SLAVE;
+      window.changeConfirm = true;
+    },
+  });
+
+  // 单据克隆
+  useTicketCloneInfo({
+    type: TicketTypes.TENDBCLUSTER_RESTORE_SLAVE,
+    onSuccess(cloneData) {
+      ticketCloneData.value = cloneData;
+      ticketType.value = TicketTypes.TENDBCLUSTER_RESTORE_SLAVE;
+      window.changeConfirm = true;
+    },
+  });
+
   const comMap = {
-    TENDBCLUSTER_RESTORE_LOCAL_SLAVE: OriginalHost,
-    TENDBCLUSTER_RESTORE_SLAVE: NewHost,
+    TENDBCLUSTER_RESTORE_LOCAL_SLAVE: {
+      content: OriginalHost,
+      createRowData: createOriginHostRowData,
+      createDefaultFormData: createOriginalHostFormData,
+    },
+    TENDBCLUSTER_RESTORE_SLAVE: {
+      content: NewHost,
+      createRowData: createNewHostRowData,
+      createDefaultFormData: createNewHostFormData,
+    },
   };
 
   const ticketType = ref<keyof typeof comMap>('TENDBCLUSTER_RESTORE_LOCAL_SLAVE');
+  const ticketCloneData = ref();
 
-  const renderCom = computed(() => comMap[ticketType.value]);
+  const renderCom = computed(() => comMap[ticketType.value].content);
+
+  watch(ticketType, () => {
+    const currentComponent = comMap[ticketType.value];
+    Object.assign(ticketCloneData, {
+      tableDataList: [currentComponent.createDefaultFormData()],
+      formData: currentComponent.createDefaultFormData(),
+    });
+  });
 </script>
 
 <style lang="less">

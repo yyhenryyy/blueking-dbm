@@ -86,10 +86,6 @@
   <ExcelAuthorize
     v-model:is-show="isShowExcelAuthorize"
     :cluster-type="ClusterTypes.TENDBSINGLE" />
-  <EditEntryConfig
-    :id="clusterId"
-    v-model:is-show="showEditEntryConfig"
-    :get-detail-info="getTendbsingleDetail" />
   <ClusterExportData
     v-if="currentData"
     v-model:is-show="showDataExportSlider"
@@ -130,28 +126,29 @@
   import {
     AccountTypes,
     ClusterTypes,
+    DBTypes,
     TicketTypes,
     type TicketTypesStrings,
     UserPersonalSettings,
   } from '@common/const';
 
-  import ClusterAuthorize from '@components/cluster-authorize/ClusterAuthorize.vue';
-  import ClusterCapacityUsageRate from '@components/cluster-capacity-usage-rate/Index.vue'
-  import ExcelAuthorize from '@components/cluster-common/ExcelAuthorize.vue';
-  import OperationBtnStatusTips from '@components/cluster-common/OperationBtnStatusTips.vue';
-  import RenderOperationTag from '@components/cluster-common/RenderOperationTag.vue';
-  import EditEntryConfig from '@components/cluster-entry-config/Index.vue';
-  import ClusterExportData from '@components/cluster-export-data/Index.vue'
   import DbStatus from '@components/db-status/index.vue';
   import DbTable from '@components/db-table/index.vue';
-  import DropdownExportExcel from '@components/dropdown-export-excel/index.vue';
   import MoreActionExtend from '@components/more-action-extend/Index.vue';
-  import RenderInstances from '@components/render-instances/RenderInstances.vue';
   import TextOverflowLayout from '@components/text-overflow-layout/Index.vue';
 
+  import ClusterAuthorize from '@views/db-manage/common/cluster-authorize/ClusterAuthorize.vue';
+  import ClusterCapacityUsageRate from '@views/db-manage/common/cluster-capacity-usage-rate/Index.vue'
+  import EditEntryConfig from '@views/db-manage/common/cluster-entry-config/Index.vue';
+  import ClusterExportData from '@views/db-manage/common/cluster-export-data/Index.vue'
   import ClusterIpCopy from '@views/db-manage/common/cluster-ip-copy/Index.vue';
+  import DropdownExportExcel from '@views/db-manage/common/dropdown-export-excel/index.vue';
+  import ExcelAuthorize from '@views/db-manage/common/ExcelAuthorize.vue';
+  import OperationBtnStatusTips from '@views/db-manage/common/OperationBtnStatusTips.vue';
   import RenderCellCopy from '@views/db-manage/common/render-cell-copy/Index.vue';
   import RenderHeadCopy from '@views/db-manage/common/render-head-copy/Index.vue';
+  import RenderInstances from '@views/db-manage/common/render-instances/RenderInstances.vue';
+  import RenderOperationTag from '@views/db-manage/common/RenderOperationTag.vue';
 
   import {
     getMenuListSearch,
@@ -208,9 +205,8 @@
   const tableRef = ref<InstanceType<typeof DbTable>>();
   const isShowExcelAuthorize = ref(false);
   const showDataExportSlider = ref(false)
-  const showEditEntryConfig = ref(false);
   const selected = ref<TendbsingleModel[]>([])
-  const currentData = ref<ColumnData['data']>()
+  const currentData = ref<ColumnData['data']>();
 
   const authorizeState = reactive({
     isShow: false,
@@ -359,17 +355,14 @@
                     }
                   ]
                 } />
-                <auth-button
-                  v-bk-tooltips={t('修改入口配置')}
-                  v-db-console="mysql.singleClusterList.modifyEntryConfiguration"
-                  action-id="access_entry_edit"
-                  resource="mysql"
-                  permission={data.permission.access_entry_edit}
-                  text
-                  theme="primary"
-                  onClick={() => handleOpenEntryConfig(data)}>
-                  <db-icon type="edit" />
-                </auth-button>
+                <span v-db-console="mysql.singleClusterList.modifyEntryConfiguration">
+                  <EditEntryConfig
+                    id={data.id}
+                    getDetailInfo={getTendbsingleDetail}
+                    permission={data.permission.access_entry_edit}
+                    resource={DBTypes.MYSQL}
+                    onSuccess={fetchData} />
+                </span>
               </>
             ),
           }}
@@ -807,11 +800,6 @@
     isShowExcelAuthorize.value = true;
   };
 
-  const handleOpenEntryConfig = (row: TendbsingleModel) => {
-    showEditEntryConfig.value  = true;
-    clusterId.value = row.id;
-  };
-
   const handleShowDataExportSlider = (data: TendbsingleModel) => {
     currentData.value = data
     showDataExportSlider.value = true;
@@ -975,7 +963,7 @@
         }
 
         .db-icon-copy,
-        .db-icon-edit {
+        .db-icon-visible1 {
           display: none;
           margin-top: 1px;
           margin-left: 4px;
@@ -1007,7 +995,7 @@
 
       :deep(td:hover) {
         .db-icon-copy,
-        .db-icon-edit {
+        .db-icon-visible1 {
           display: inline-block !important;
         }
       }

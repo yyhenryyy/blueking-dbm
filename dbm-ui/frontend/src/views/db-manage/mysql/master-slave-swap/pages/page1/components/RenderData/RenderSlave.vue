@@ -18,7 +18,7 @@
         ref="editRef"
         v-model="localValue"
         :list="slaveHostSelectList"
-        :placeholder="$t('请输入选择从库')"
+        :placeholder="t('请输入选择从库')"
         :rules="rules" />
     </BkLoading>
   </div>
@@ -47,7 +47,7 @@
   }
 
   interface Exposes {
-    getValue: (field: string) => Promise<string>;
+    getValue: () => Promise<{ slave_ip: ISlaveHost }>;
   }
 
   interface ISlaveHost {
@@ -118,12 +118,19 @@
 
   defineExpose<Exposes>({
     getValue() {
-      return editRef.value.getValue().then(() => {
-        const slaveHostData = _.find(allSlaveHostList, (item) => genHostKey(item) === localValue.value);
-        return {
-          slave_ip: slaveHostData,
-        };
-      });
+      return editRef.value
+        .getValue()
+        .then(() => {
+          const slaveHostData = _.find(allSlaveHostList, (item) => genHostKey(item) === localValue.value);
+          return {
+            slave_ip: slaveHostData,
+          };
+        })
+        .catch(() =>
+          Promise.reject({
+            slave_ip: undefined,
+          }),
+        );
     },
   });
 </script>

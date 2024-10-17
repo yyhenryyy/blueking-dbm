@@ -386,7 +386,7 @@
   import { useI18n } from 'vue-i18n';
   import { useRoute } from 'vue-router';
 
-  import type { BizItem, HostDetails } from '@services/types';
+  import type { BizItem, HostInfo } from '@services/types';
 
   import { useApplyBase, useTicketCloneInfo } from '@hooks';
 
@@ -394,12 +394,13 @@
   import { OSTypes } from '@common/const';
   import { nameRegx } from '@common/regex';
 
-  import AffinityItem from '@components/apply-items/AffinityItem.vue';
-  import BusinessItems from '@components/apply-items/BusinessItems.vue';
-  import CloudItem from '@components/apply-items/CloudItem.vue';
-  import RegionItem from '@components/apply-items/RegionItem.vue';
-  import SpecSelector from '@components/apply-items/SpecSelector.vue';
   import IpSelector from '@components/ip-selector/IpSelector.vue';
+
+  import AffinityItem from '@views/db-manage/common/apply-items/AffinityItem.vue';
+  import BusinessItems from '@views/db-manage/common/apply-items/BusinessItems.vue';
+  import CloudItem from '@views/db-manage/common/apply-items/CloudItem.vue';
+  import RegionItem from '@views/db-manage/common/apply-items/RegionItem.vue';
+  import SpecSelector from '@views/db-manage/common/apply-items/SpecSelector.vue';
 
   import DomainTable from './components/MySQLDomainTable.vue';
   import PreviewTable from './components/PreviewTable.vue';
@@ -656,7 +657,7 @@
           })
         : false,
   };
-  const makeMapByHostId = (hostList: HostDetails[]) =>
+  const makeMapByHostId = (hostList: HostInfo[]) =>
     hostList.reduce(
       (result, item) => ({
         ...result,
@@ -695,7 +696,7 @@
   /**
    * 更新 Proxy IP
    */
-  function handleProxyIpChange(data: HostDetails[]) {
+  function handleProxyIpChange(data: HostInfo[]) {
     formdata.details.nodes.proxy = [...data];
     if (formdata.details.nodes.proxy.length > 0) {
       proxyRef.value.clearValidate();
@@ -705,7 +706,7 @@
   /**
    * 更新 Backend
    */
-  function handleBackendIpChange(data: HostDetails[]) {
+  function handleBackendIpChange(data: HostInfo[]) {
     formdata.details.nodes.backend = [...data];
     if (formdata.details.nodes.backend.length > 0) {
       backendRef.value.clearValidate();
@@ -754,7 +755,7 @@
   /**
    * 格式化 IP 提交格式
    */
-  function formatNodes(hosts: HostDetails[]) {
+  function formatNodes(hosts: HostInfo[]) {
     return hosts.map((host) => ({
       ip: host.ip,
       bk_host_id: host.host_id,
@@ -793,7 +794,7 @@
             return {
               ...details,
               resource_spec: {
-                single: {
+                backend: {
                   ...details.resource_spec.single,
                   ...specSingleRef.value.getData(),
                   count: hostNums.value,
@@ -815,10 +816,10 @@
                 ...regionAndDisasterParams,
                 count: hostNums.value,
               },
-              backend: {
+              backend_group: {
                 ...details.resource_spec.backend,
                 ...specBackendRef.value.getData(),
-                count: hostNums.value,
+                count: Math.floor(hostNums.value / 2),
                 location_spec: {
                   city: cityCode,
                   sub_zone_ids: [],

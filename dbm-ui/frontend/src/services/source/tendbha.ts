@@ -12,10 +12,11 @@
  */
 
 import TendbhaModel from '@services/model/mysql/tendbha';
+import TendbhaDetailModel from '@services/model/mysql/tendbha-detail';
 import TendbhaInstanceModel from '@services/model/mysql/tendbha-instance';
+import type { ListBase, ResourceTopo } from '@services/types';
 
 import http from '../http';
-import type { ListBase, ResourceItem, ResourceTopo } from '../types';
 
 const getRootPath = () => `/apis/mysql/bizs/${window.PROJECT_CONFIG.BIZ_ID}/tendbha_resources`;
 
@@ -46,6 +47,34 @@ export function getTendbhaList(params: {
         ),
     ),
   }));
+}
+
+/**
+ * 查询资源列表
+ */
+export function getTendbhaFlatList(params: {
+  bk_biz_id?: number;
+  limit?: number;
+  offset?: number;
+  type?: string;
+  dbType?: string;
+  cluster_ids?: number[] | number;
+  domain?: string;
+  master_domain?: string;
+  slave_domain?: string;
+  exact_domain?: string;
+  id?: string;
+}) {
+  return http.get<ListBase<TendbhaModel[]>>(`${getRootPath()}/`, params).then((data) =>
+    data.results.map(
+      (item) =>
+        new TendbhaModel(
+          Object.assign(item, {
+            permission: Object.assign({}, item.permission, data.permission),
+          }),
+        ),
+    ),
+  );
 }
 
 export function getTendbhaSalveList(params: {
@@ -113,40 +142,6 @@ export const getTendbhaInstanceList = function (params: Record<string, any> & { 
 };
 
 /**
- * 集群实例详情
- */
-interface InstanceDetails {
-  bk_cloud_id: number;
-  bk_cpu: number;
-  bk_disk: number;
-  bk_host_id: number;
-  bk_host_innerip: string;
-  bk_mem: number;
-  bk_os_name: string;
-  cluster_id: number;
-  cluster_type: string;
-  create_at: string;
-  idc_city_id: string;
-  idc_city_name: string;
-  idc_id: number;
-  instance_address: string;
-  master_domain: string;
-  net_device_id: string;
-  rack: string;
-  rack_id: number;
-  role: string;
-  slave_domain: string;
-  status: string;
-  sub_zone: string;
-  db_module_id: number;
-  cluster_type_display: string;
-  bk_idc_name: string;
-  bk_cloud_name: string;
-  db_version: string;
-  version?: string;
-}
-
-/**
  * 获取集群实例详情
  */
 export function retrieveTendbhaInstance(params: {
@@ -156,14 +151,16 @@ export function retrieveTendbhaInstance(params: {
   cluster_id?: number;
   dbType: string;
 }) {
-  return http.get<InstanceDetails>(`${getRootPath()}/retrieve_instance/`, params);
+  return http
+    .get<TendbhaInstanceModel>(`${getRootPath()}/retrieve_instance/`, params)
+    .then((data) => new TendbhaInstanceModel(data));
 }
 
 /**
  * 获取集群详情
  */
 export function getTendbhaDetail(params: { id: number }) {
-  return http.get<ResourceItem>(`${getRootPath()}/${params.id}/`);
+  return http.get<TendbhaDetailModel>(`${getRootPath()}/${params.id}/`).then((data) => new TendbhaDetailModel(data));
 }
 
 /**

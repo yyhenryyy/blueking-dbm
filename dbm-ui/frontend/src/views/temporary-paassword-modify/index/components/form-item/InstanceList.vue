@@ -15,6 +15,7 @@
     <BkTable
       :columns="columns"
       :data="modelValue"
+      :max-height="300"
       show-overflow-tooltip>
       <!-- <BkTableColumn label="asdasd">
         <template #default="{ data }"> {{ data.instance_address }}sadadad </template>
@@ -44,12 +45,16 @@
   import { useI18n } from 'vue-i18n';
   import { useRequest } from 'vue-request';
 
+  import TendbhaModel from '@services/model/mysql/tendbha';
   import TendbhaInstanceModel from '@services/model/mysql/tendbha-instance';
-  import TendbInstanceModel from '@services/model/spider/tendbInstance';
+  import TendbsingleModel from '@services/model/mysql/tendbsingle';
+  import SqlServerHaModel from '@services/model/sqlserver/sqlserver-ha';
   import SqlServerHaInstanceModel from '@services/model/sqlserver/sqlserver-ha-instance';
   import SqlServerSingleInstanceModel from '@services/model/sqlserver/sqlserver-single-instance';
+  import TendbclusterModel from '@services/model/tendbcluster/tendbcluster';
+  import TendbclusterInstanceModel from '@services/model/tendbcluster/tendbcluster-instance';
   import { queryAdminPassword } from '@services/source/permission';
-  import { getSpiderInstanceList } from '@services/source/spider';
+  import { getTendbclusterInstanceList } from '@services/source/tendbcluster';
   import { getTendbhaInstanceList } from '@services/source/tendbha';
 
   import { clusterTypeInfos,ClusterTypes } from '@common/const';
@@ -57,7 +62,7 @@
   import InstanceSelector, { type InstanceSelectorValues, type IValue, type PanelListType } from '@components/instance-selector/Index.vue';
 
 
-  type IRowData = TendbhaInstanceModel|TendbInstanceModel|SqlServerHaInstanceModel|SqlServerSingleInstanceModel
+  type IRowData = TendbhaInstanceModel|TendbclusterInstanceModel|SqlServerHaInstanceModel|SqlServerSingleInstanceModel
 
   const { t } = useI18n();
 
@@ -65,10 +70,22 @@
     `${instance.bk_cloud_id}:${instance.ip}:${instance.port}`;
 
   const tabListConfig = {
+    [ClusterTypes.TENDBSINGLE]: [
+      {
+        id: 'tendbsingle',
+        name: t('Mysql 单节点'),
+        topoConfig: {
+          countFunc: (item: TendbsingleModel) => item.masters.length,
+        }
+      }
+    ],
     [ClusterTypes.TENDBHA]: [
       {
         id: 'tendbha',
         name: t('Mysql 主从'),
+        topoConfig: {
+          countFunc: (item: TendbhaModel) => item.masters.length + item.slaves.length,
+        },
         tableConfig: {
           getTableList: (params: ServiceParameters<typeof getTendbhaInstanceList>) => getTendbhaInstanceList({
             ...params,
@@ -85,8 +102,11 @@
     [ClusterTypes.TENDBCLUSTER]: [
       {
         name: 'TendbCluster',
+        topoConfig: {
+          countFunc: (item: TendbclusterModel) => item.remote_db.length + item.remote_dr.length + item.spider_master.length * 2 + item.spider_slave.length,
+        },
         tableConfig: {
-          getTableList: (params: ServiceParameters<typeof getSpiderInstanceList>) => getSpiderInstanceList({
+          getTableList: (params: ServiceParameters<typeof getTendbclusterInstanceList>) => getTendbclusterInstanceList({
             ...params,
             spider_ctl: true,
           }),
@@ -97,6 +117,13 @@
           },
         },
       },
+    ],
+    [ClusterTypes.SQLSERVER_HA]: [
+      {
+        topoConfig: {
+          countFunc: (item: SqlServerHaModel) => item.masters.length + item.slaves.length,
+        }
+      }
     ],
   } as unknown as Record<ClusterTypes, PanelListType>;
 
@@ -109,7 +136,7 @@
   const instanceSelectorValue = shallowRef<Record<string, IValue[]>>({
     [ClusterTypes.TENDBSINGLE]: [] as TendbhaInstanceModel[],
     [ClusterTypes.TENDBHA]: [] as TendbhaInstanceModel[],
-    [ClusterTypes.TENDBCLUSTER]: [] as TendbInstanceModel[],
+    [ClusterTypes.TENDBCLUSTER]: [] as TendbclusterInstanceModel[],
     [ClusterTypes.SQLSERVER_HA]: [] as SqlServerHaInstanceModel[],
     [ClusterTypes.SQLSERVER_SINGLE]: [] as SqlServerSingleInstanceModel[],
   });

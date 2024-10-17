@@ -9,8 +9,9 @@
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for
  * the specific language governing permissions and limitations under the License.
-*/
+ */
 import { utcDisplayTime } from '@utils';
+
 export default class EsNode {
   static ROLE_MASTER = 'es_master';
   static ROLE_CLIENT = 'es_client';
@@ -28,12 +29,17 @@ export default class EsNode {
   machine_type: string;
   mem: number;
   node_count: number;
+  permission: {
+    es_view: boolean;
+    es_enable_disable: boolean;
+    es_destroy: boolean;
+    es_scale_up: boolean;
+    es_shrink: boolean;
+    es_replace: boolean;
+    es_reboot: boolean;
+  };
   role: string;
   status: number;
-  permission: Record<
-    'es_view' | 'es_enable_disable' | 'es_destroy' | 'es_scale_up' | 'es_shrink' | 'es_replace' | 'es_reboot',
-    boolean
-  >;
 
   constructor(payload = {} as EsNode) {
     this.bk_cloud_id = payload.bk_cloud_id;
@@ -47,9 +53,9 @@ export default class EsNode {
     this.machine_type = payload.machine_type;
     this.mem = payload.mem || 0;
     this.node_count = payload.node_count || 0;
+    this.permission = payload.permission || {};
     this.role = payload.role;
     this.status = payload.status || 0;
-    this.permission = payload.permission || {};
   }
 
   get isMaster() {

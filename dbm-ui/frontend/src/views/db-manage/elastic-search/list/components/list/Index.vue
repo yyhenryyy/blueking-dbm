@@ -97,13 +97,10 @@
       </template>
     </BkDialog>
   </div>
-  <EditEntryConfig
-    :id="clusterId"
-    v-model:is-show="showEditEntryConfig"
-    :get-detail-info="getEsDetail" />
 </template>
 <script setup lang="tsx">
   import { InfoBox, Message } from 'bkui-vue';
+  import type { ISearchItem } from 'bkui-vue/lib/search-select/utils';
   import { useI18n } from 'vue-i18n';
   import {
     useRoute,
@@ -133,23 +130,24 @@
 
   import {
     ClusterTypes,
+    DBTypes,
     UserPersonalSettings,
   } from '@common/const';
 
-  import ClusterCapacityUsageRate from '@components/cluster-capacity-usage-rate/Index.vue'
-  import OperationBtnStatusTips from '@components/cluster-common/OperationBtnStatusTips.vue';
-  import RenderNodeInstance from '@components/cluster-common/RenderNodeInstance.vue';
-  import RenderOperationTag from '@components/cluster-common/RenderOperationTag.vue';
-  import RenderPassword from '@components/cluster-common/RenderPassword.vue';
-  import RenderClusterStatus from '@components/cluster-common/RenderStatus.vue';
-  import EditEntryConfig from '@components/cluster-entry-config/Index.vue';
+  import RenderClusterStatus from '@components/cluster-status/Index.vue';
   import DbTable from '@components/db-table/index.vue';
-  import DropdownExportExcel from '@components/dropdown-export-excel/index.vue';
   import TextOverflowLayout from '@components/text-overflow-layout/Index.vue';
 
+  import ClusterCapacityUsageRate from '@views/db-manage/common/cluster-capacity-usage-rate/Index.vue'
+  import EditEntryConfig from '@views/db-manage/common/cluster-entry-config/Index.vue';
   import ClusterIpCopy from '@views/db-manage/common/cluster-ip-copy/Index.vue';
+  import DropdownExportExcel from '@views/db-manage/common/dropdown-export-excel/index.vue';
+  import OperationBtnStatusTips from '@views/db-manage/common/OperationBtnStatusTips.vue';
   import RenderCellCopy from '@views/db-manage/common/render-cell-copy/Index.vue';
   import RenderHeadCopy from '@views/db-manage/common/render-head-copy/Index.vue';
+  import RenderNodeInstance from '@views/db-manage/common/RenderNodeInstance.vue';
+  import RenderOperationTag from '@views/db-manage/common/RenderOperationTag.vue';
+  import RenderPassword from '@views/db-manage/common/RenderPassword.vue';
   import ClusterExpansion from '@views/db-manage/elastic-search/common/expansion/Index.vue';
   import ClusterShrink from '@views/db-manage/elastic-search/common/shrink/Index.vue';
 
@@ -158,11 +156,6 @@
     getSearchSelectorParams,
     isRecentDays,
   } from '@utils';
-
-  import type {
-    SearchSelectData,
-    SearchSelectItem,
-  } from '@/types/bkui-vue';
 
   const clusterId = defineModel<number>('clusterId');
 
@@ -267,7 +260,7 @@
       multiple: true,
       children: searchAttrs.value.time_zone,
     },
-  ] as SearchSelectData);
+  ]);
 
   const dataSource = getEsList;
   const tableRef = ref<InstanceType<typeof DbTable>>();
@@ -275,7 +268,6 @@
   const isShowShrink = ref(false);
   const isShowPassword = ref(false);
   const isInit = ref(true);
-  const showEditEntryConfig = ref(false);
   const selected = ref<EsModel[]>([])
   const operationData = shallowRef<EsModel>();
   const tableDataActionLoadingMap = shallowRef<Record<number, boolean>>({});
@@ -377,17 +369,14 @@
                     ]
                   } />
                 )}
-                <auth-button
-                  v-bk-tooltips={t('修改入口配置')}
-                  v-db-console="es.clusterManage.modifyEntryConfiguration"
-                  action-id="access_entry_edit"
-                  resource="es"
+                <span v-db-console="es.clusterManage.modifyEntryConfiguration">
+                  <EditEntryConfig
+                  id={data.id}
+                  getDetailInfo={getEsDetail}
                   permission={data.permission.access_entry_edit}
-                  text
-                  theme="primary"
-                  onClick={() => handleOpenEntryConfig(data)}>
-                  <db-icon type="edit" />
-                </auth-button>
+                  resource={DBTypes.ES}
+                  onSuccess={fetchTableData} />
+                </span>
               </>
             ),
           }}
@@ -684,6 +673,7 @@
               <auth-button
                 text
                 theme="primary"
+                disabled={data.isStarting}
                 action-id="es_enable_disable"
                 permission={data.permission.es_enable_disable}
                 v-db-console="es.clusterManage.enable"
@@ -795,6 +785,7 @@
       'es_datanode_hot',
       'es_datanode_cold',
     ],
+    showLineHeight: false,
     trigger: 'manual' as const,
   };
 
@@ -803,7 +794,7 @@
     updateTableSettings,
   } = useTableSettings(UserPersonalSettings.ES_TABLE_SETTINGS, defaultSettings);
 
-  const getMenuList = async (item: SearchSelectItem | undefined, keyword: string) => {
+  const getMenuList = async (item: ISearchItem | undefined, keyword: string) => {
     if (item?.id !== 'creator' && keyword) {
       return getMenuListSearch(item, keyword, serachData.value, searchValue.value);
     }
@@ -830,11 +821,6 @@
 
     // 不需要远层加载
     return serachData.value.find(set => set.id === item.id)?.children || [];
-  };
-
-  const handleOpenEntryConfig = (row: EsModel) => {
-    showEditEntryConfig.value  = true;
-    clusterId.value = row.id;
   };
 
   const fetchTableData = (loading?:boolean) => {
@@ -1139,7 +1125,7 @@
         align-items: center;
       }
 
-      .db-icon-edit {
+      .db-icon-visible1 {
         display: none;
         margin-top: 1px;
         margin-left: 4px;
@@ -1149,7 +1135,7 @@
     }
 
     :deep(td:hover) {
-      .db-icon-edit {
+      .db-icon-visible1 {
         display: inline-block !important;
       }
     }

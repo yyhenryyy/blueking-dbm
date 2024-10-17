@@ -124,55 +124,6 @@ type MySQLClientOpt struct {
 	BinaryMode bool `json:"binary_mode"`
 }
 
-// MySQLBinlogUtil TODO
-type MySQLBinlogUtil struct {
-	// --start-datetime  时间格式
-	// 格式 "2006-01-02 15:04:05" 原样传递给 mysqlbinlog
-	// 格式"2006-01-02T15:04:05Z07:00"(示例"2023-12-11T05:03:05+08:00")按照机器本地时间，解析成 "2006-01-02 15:04:05" 再传递给 mysqlbinlog
-	// 在 Init 时会统一把时间字符串转换成 time.RFC3399
-	StartTime string `json:"start_time"`
-	// --stop-datetime   时间格式同 StartTime，可带时区，会转换成机器本地时间
-	StopTime string `json:"stop_time"`
-	// --start-position
-	StartPos uint `json:"start_pos,omitempty"`
-	// --stop-position
-	StopPos uint `json:"stop_pos,omitempty"`
-	// 是否开启幂等模式, mysqlbinlog --idempotent(>=5.7)
-	IdempotentMode bool `json:"idempotent_mode"`
-	// 导入时是否记录 binlog, mysql sql_log_bin=0 or mysqlbinlog --disable-log-bin. true表示不写
-	NotWriteBinlog bool `json:"not_write_binlog"`
-
-	// row event 解析指定 databases。必须是精确，不能是通配
-	Databases []string `json:"databases,omitempty"`
-	// row event 解析指定 tables。必须是精确，不能是通配
-	Tables []string `json:"tables,omitempty"`
-	// row event 解析指定 忽略 databases
-	DatabasesIgnore []string `json:"databases_ignore,omitempty"`
-	// row event 解析指定 忽略 tables
-	TablesIgnore []string `json:"tables_ignore,omitempty"`
-
-	// query event 默认处理策略。keep:保留解析出的query event 语句, ignore:注释(丢弃)该 query event, error:认为是不接受的语句，报错
-	// 默认 keep
-	QueryEventHandler string `json:"query_event_handler" enums:"keep,ignore,safe,error"`
-	// 匹配字符串成功，强制忽略语句，加入注释中。当与 filter_statement_match_error 都匹配时，ignore_force会优先生效
-	// 默认 infodba_schema
-	FilterStatementMatchIgnoreForce string `json:"filter_statement_match_ignore_force"`
-	// 匹配字符串成功，则解析 binlog 报错
-	FilterStatementMatchError string `json:"filter_statement_match_error"`
-	// 匹配字符串成功，则忽略语句，加入注释中
-	FilterStatementMatchIgnore string `json:"filter_statement_match_ignore"`
-
-	// --rewrite_db="db1->xx_db1,db2->xx_db2"
-	RewriteDB string `json:"rewrite_db"`
-
-	MySQLClientOpt *MySQLClientOpt `json:"mysql_client_opt"`
-	// 是否启用 flashback
-	Flashback bool `json:"flashback,omitempty"`
-
-	// mysqlbinlog options string
-	options string
-}
-
 func (r *RecoverBinlog) parse(f string) error {
 	parsedName := fmt.Sprintf(`%s/%s.sql`, dirBinlogParsed, f)
 	cmd := fmt.Sprintf("cd %s && %s %s/%s  >%s", r.taskDir, r.binlogCli, r.BinlogDir, f, parsedName)
@@ -465,19 +416,6 @@ func (r *RecoverBinlog) buildBinlogOptions() error {
 	r.binlogCli += fmt.Sprintf("%s %s", binlogTool, r.RecoverOpt.options)
 	logger.Info("mysqlbinlog parse cmd:%s", r.binlogCli)
 	return nil
-}
-
-// mysqlbinlogHasOpt return nil if option exists
-func mysqlbinlogHasOpt(binlogCmd string, option string) error {
-	outStr, errStr, err := cmutil.ExecCommand(false, "", binlogCmd, "--help")
-	if err != nil {
-		return err
-	}
-	if strings.Contains(errStr, option) || strings.Contains(outStr, option) {
-		return nil
-	} else {
-		return errors.Errorf("mysqlbinlog %s has no option %s", binlogCmd, option)
-	}
 }
 
 func (r *RecoverBinlog) buildFilterOpts() error {

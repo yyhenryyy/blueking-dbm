@@ -9,8 +9,8 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 
-import itertools
 import time
+from collections import defaultdict
 from typing import Dict, List
 
 from django.utils.translation import ugettext_lazy as _
@@ -47,11 +47,13 @@ from backend.db_services.dbresource.serializers import (
     ResourceImportSerializer,
     ResourceListResponseSerializer,
     ResourceListSerializer,
+    ResourceSummaryResponseSerializer,
+    ResourceSummarySerializer,
     ResourceUpdateSerializer,
     SpecCountResourceResponseSerializer,
     SpecCountResourceSerializer,
 )
-from backend.db_services.ipchooser.constants import BkOsType, ModeType
+from backend.db_services.ipchooser.constants import BK_OS_CODE__TYPE, BkOsType, ModeType
 from backend.db_services.ipchooser.handlers.host_handler import HostHandler
 from backend.db_services.ipchooser.handlers.topo_handler import TopoHandler
 from backend.db_services.ipchooser.query.resource import ResourceQueryHelper
@@ -96,27 +98,28 @@ class DBResourceViewSet(viewsets.SystemViewSet):
         responses={status.HTTP_200_OK: ResourceListResponseSerializer()},
         tags=[SWAGGER_TAG],
     )
+    @action(
+        detail=False, methods=["POST"], url_path="list", serializer_class=ResourceListSerializer, pagination_class=None
+    )
     @Permission.decorator_external_permission_field(
         param_field=lambda d: None,
         actions=[ActionEnum.RESOURCE_POLL_MANAGE],
         resource_meta=None,
     )
-    @action(detail=False, methods=["POST"], url_path="list", serializer_class=ResourceListSerializer)
     def resource_list(self, request):
-        def _format_resource_fields(data, _cloud_info, _for_biz_infos):
+        def _format_resource_fields(data, _cloud_info, _biz_infos):
             data.update(
                 {
                     "bk_cloud_name": _cloud_info[str(data["bk_cloud_id"])]["bk_cloud_name"],
                     "bk_host_innerip": data["ip"],
-                    # 内存 MB --> GB
                     "bk_mem": data.pop("dram_cap"),
                     "bk_cpu": data.pop("cpu_num"),
                     "bk_disk": data.pop("total_storage_cap"),
-                    "resource_types": data.pop("resource_types"),
-                    "for_bizs": [
-                        {"bk_biz_id": int(bk_biz_id), "bk_biz_name": _for_biz_infos[int(bk_biz_id)]}
-                        for bk_biz_id in data.pop("for_bizs")
-                    ],
+                    "resource_type": data.pop("rs_type"),
+                    "for_biz": {
+                        "bk_biz_id": data["dedicated_biz"],
+                        "bk_biz_name": _biz_infos.get(data["dedicated_biz"]),
+                    },
                     "agent_status": int((data.pop("gse_agent_status_code") == GSE_AGENT_RUNNING_CODE)),
                 }
             )
@@ -128,8 +131,7 @@ class DBResourceViewSet(viewsets.SystemViewSet):
 
         # 获取云区域信息和业务信息
         cloud_info = ResourceQueryHelper.search_cc_cloud(get_cache=True)
-        for_biz_ids = list(set(itertools.chain(*[data["for_bizs"] for data in resource_data["details"]])))
-        for_biz_ids = list(map(int, for_biz_ids))
+        for_biz_ids = [data["dedicated_biz"] for data in resource_data["details"] if data["dedicated_biz"]]
         for_biz_infos = AppCache.batch_get_app_attr(bk_biz_ids=for_biz_ids, attr_name="bk_biz_name")
         # 格式化资源池字段信息
         for data in resource_data.get("details") or []:
@@ -140,7 +142,7 @@ class DBResourceViewSet(viewsets.SystemViewSet):
 
     @common_swagger_auto_schema(
         operation_summary=_("获取DBA业务下的主机信息"),
-        query_serializer=ListDBAHostsSerializer,
+        query_serializer=ListDBAHostsSerializer(),
         tags=[SWAGGER_TAG],
     )
     @action(detail=False, methods=["GET"], url_path="list_dba_hosts", serializer_class=ListDBAHostsSerializer)
@@ -168,7 +170,7 @@ class DBResourceViewSet(viewsets.SystemViewSet):
 
     @common_swagger_auto_schema(
         operation_summary=_("查询DBA业务下的主机信息"),
-        query_serializer=QueryDBAHostsSerializer,
+        query_serializer=QueryDBAHostsSerializer(),
         tags=[SWAGGER_TAG],
     )
     @action(detail=False, methods=["GET"], url_path="query_dba_hosts", serializer_class=QueryDBAHostsSerializer)
@@ -187,34 +189,48 @@ class DBResourceViewSet(viewsets.SystemViewSet):
     @action(detail=False, methods=["POST"], url_path="import", serializer_class=ResourceImportSerializer)
     def resource_import(self, request):
         validated_data = self.params_validate(self.get_serializer_class())
-        root_id = generate_root_id()
+        host_ids = [host["host_id"] for host in validated_data.pop("hosts")]
 
-        # 补充必要的单据参数
-        validated_data.update(
-            ticket_type=TicketType.RESOURCE_IMPORT,
-            created_by=request.user.username,
-            uid=None,
-            # 额外补充资源池导入的参数，用于记录操作日志
-            bill_id=None,
-            bill_type=None,
-            task_id=root_id,
-            operator=request.user.username,
-        )
+        # 查询主机信息，并按照集群类型聚合
+        host_infos = ResourceQueryHelper.search_cc_hosts(role_host_ids=host_ids)
+        os_hosts = defaultdict(list)
+        for host in host_infos:
+            host.update(ip=host["bk_host_innerip"], host_id=host["bk_host_id"])
+            os_hosts[host["bk_os_type"]].append(host)
 
-        # 资源导入记录
-        import_record = {"task_id": root_id, "operator": request.user.username, "hosts": validated_data["hosts"]}
-        DBResourceApi.import_operation_create(params=import_record)
+        # 按照集群类型分别导入
+        for os_type, hosts in os_hosts.items():
+            root_id = generate_root_id()
 
-        # 执行资源导入的后台flow
-        BaseController(root_id=root_id, ticket_data=validated_data).import_resource_init_step()
+            # 补充必要的单据参数
+            validated_data.update(
+                ticket_type=TicketType.RESOURCE_IMPORT,
+                created_by=request.user.username,
+                uid=None,
+                hosts=hosts,
+                # 额外补充资源池导入的参数，用于记录操作日志
+                bill_id=None,
+                bill_type=None,
+                task_id=root_id,
+                operator=request.user.username,
+                os_type=BK_OS_CODE__TYPE[os_type],
+            )
 
-        # 缓存当前任务，并删除过期导入任务
-        now = int(time.time())
-        cache_key = RESOURCE_IMPORT_TASK_FIELD.format(user=request.user.username)
-        RedisConn.zadd(cache_key, {root_id: now})
-        expired_tasks = RedisConn.zrangebyscore(cache_key, "-inf", now - RESOURCE_IMPORT_EXPIRE_TIME)
-        if expired_tasks:
-            RedisConn.zrem(cache_key, *expired_tasks)
+            # 资源导入记录
+            import_record = {"task_id": root_id, "operator": request.user.username, "hosts": hosts}
+            DBResourceApi.import_operation_create(params=import_record)
+
+            # 执行资源导入的后台flow
+            validated_data.update(hosts=list(hosts), os_type=BK_OS_CODE__TYPE[os_type])
+            BaseController(root_id=root_id, ticket_data=validated_data).import_resource_init_step()
+
+            # 缓存当前任务，并删除过期导入任务
+            now = int(time.time())
+            cache_key = RESOURCE_IMPORT_TASK_FIELD.format(user=request.user.username)
+            RedisConn.zadd(cache_key, {root_id: now})
+            expired_tasks = RedisConn.zrangebyscore(cache_key, "-inf", now - RESOURCE_IMPORT_EXPIRE_TIME)
+            if expired_tasks:
+                RedisConn.zrem(cache_key, *expired_tasks)
 
         return Response()
 
@@ -352,6 +368,30 @@ class DBResourceViewSet(viewsets.SystemViewSet):
     def resource_update(self, request):
         update_params = self.params_validate(self.get_serializer_class())
         return Response(DBResourceApi.resource_batch_update(params=update_params))
+
+    @common_swagger_auto_schema(
+        operation_summary=_("按照组件统计资源数量"),
+        tags=[SWAGGER_TAG],
+    )
+    @action(detail=False, methods=["GET"])
+    def resource_group_count(self, request):
+        return Response(DBResourceApi.resource_group_count())
+
+    @common_swagger_auto_schema(
+        operation_summary=_("按照条件聚合资源统计"),
+        query_serializer=ResourceSummarySerializer(),
+        responses={status.HTTP_200_OK: ResourceSummaryResponseSerializer()},
+        tags=[SWAGGER_TAG],
+    )
+    @action(methods=["GET"], detail=False, serializer_class=ResourceSummarySerializer)
+    def resource_summary(self, request):
+        group_params = self.params_validate(self.get_serializer_class())
+        summary_data = DBResourceApi.resource_summary(params=group_params)
+        # 补充业务名
+        for_biz_ids = [data["dedicated_biz"] for data in summary_data]
+        for_biz_infos = AppCache.batch_get_app_attr(bk_biz_ids=for_biz_ids, attr_name="bk_biz_name")
+        summary_data = [{"for_biz_name": for_biz_infos.get(data["dedicated_biz"]), **data} for data in summary_data]
+        return Response(summary_data)
 
     @common_swagger_auto_schema(
         operation_summary=_("获取资源导入相关链接"),

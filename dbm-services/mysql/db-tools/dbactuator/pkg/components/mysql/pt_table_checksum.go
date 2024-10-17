@@ -133,6 +133,8 @@ func (c *PtTableChecksumComp) GenerateConfigFile() (err error) {
 		c.GeneralParam.RuntimeAccountParam.MonitorUser, c.GeneralParam.RuntimeAccountParam.MonitorPwd,
 		"http://127.0.0.1:9999", logDir, c.tools)
 
+	cfg.PtChecksum.Replicate = c.Params.ReplicateTable
+
 	var ignoreDbs []string
 	ignoreDbs = append(ignoreDbs, c.Params.SystemDbs...)
 	ignoreDbs = append(ignoreDbs, []string{
@@ -160,7 +162,7 @@ func (c *PtTableChecksumComp) GenerateConfigFile() (err error) {
 		return err
 	}
 
-	c.cfgFile = path.Join("/tmp", fmt.Sprintf("checksum_%s.yaml", c.uid))
+	c.cfgFile = path.Join("/tmp", fmt.Sprintf("checksum_%d_%s.yaml", c.Params.MasterPort, c.uid))
 	err = os.WriteFile(c.cfgFile, yamlData, 0644)
 	if err != nil {
 		logger.Error("write config failed: %s", err.Error())

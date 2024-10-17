@@ -32,6 +32,7 @@
           @cluster-input-finish="(domainObj: RedisModel) => handleChangeCluster(index, domainObj)"
           @remove="handleRemove(index)" />
       </RenderData>
+      <TicketRemark v-model="remark" />
     </div>
     <template #action>
       <BkButton
@@ -66,6 +67,7 @@
   import { useI18n } from 'vue-i18n';
   import { useRouter } from 'vue-router';
 
+  import RedisModel from '@services/model/redis/redis';
   import { getRedisList } from '@services/source/redis';
   import { createTicket } from '@services/source/ticket';
 
@@ -75,12 +77,11 @@
 
   import { ClusterTypes, TicketTypes } from '@common/const';
 
-  import ClusterSelector from '@components/cluster-selector/Index.vue';
+  import ClusterSelector, { type TabItem } from '@components/cluster-selector/Index.vue';
+  import TicketRemark from '@components/ticket-remark/Index.vue';
 
   import RenderData from './components/Index.vue';
   import RenderDataRow, { createRowData, type IDataRow, type InfoItem } from './components/Row.vue';
-
-  type RedisModel = ServiceReturnType<typeof getRedisList>['results'][number];
 
   const router = useRouter();
   const { currentBizId } = useGlobalBizs();
@@ -90,7 +91,8 @@
   useTicketCloneInfo({
     type: TicketTypes.REDIS_SCALE_UPDOWN,
     onSuccess(cloneData) {
-      tableData.value = cloneData;
+      tableData.value = cloneData.tableDataList;
+      remark.value = cloneData.remark;
       window.changeConfirm = true;
     },
   });
@@ -99,6 +101,8 @@
   const isShowMasterInstanceSelector = ref(false);
   const isSubmitting = ref(false);
   const tableData = ref([createRowData()]);
+  const remark = ref('');
+
   const selectedClusters = shallowRef<{ [key: string]: Array<RedisModel> }>({ [ClusterTypes.REDIS]: [] });
 
   const inputedClusters = computed(() => tableData.value.map((item) => item.targetCluster));
@@ -120,7 +124,7 @@
           ...params,
         }),
     },
-  };
+  } as unknown as Record<ClusterTypes, TabItem>;
 
   // 检测列表是否为空
   const checkListEmpty = (list: Array<IDataRow>) => {
@@ -139,15 +143,20 @@
     currentSepc: data.cluster_spec.spec_name,
     clusterId: data.id,
     bkCloudId: data.bk_cloud_id,
-    cluster_type_name: data.cluster_type_name,
+    clusterTypeName: data.cluster_type_name,
+    clusterStats: data.cluster_stats,
     shardNum: data.cluster_shard_num,
     groupNum: data.machine_pair_cnt,
+    machineCount: data.redis_master.length,
     version: data.major_version,
     clusterType: data.cluster_spec.spec_cluster_type,
     currentCapacity: {
       used: 1,
       total: data.cluster_capacity,
     },
+    spec: data.cluster_spec,
+    targetShardNum: 0,
+    targetGroupNum: 0,
   });
 
   // 批量选择
@@ -208,6 +217,7 @@
       const params = {
         bk_biz_id: currentBizId,
         ticket_type: TicketTypes.REDIS_SCALE_UPDOWN,
+        remark: remark.value,
         details: {
           ip_source: 'resource_pool',
           infos,
@@ -233,6 +243,7 @@
 
   const handleReset = () => {
     tableData.value = [createRowData()];
+    remark.value = '';
     selectedClusters.value[ClusterTypes.REDIS] = [];
     domainMemo = {};
     window.changeConfirm = false;

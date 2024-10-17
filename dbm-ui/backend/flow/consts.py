@@ -68,6 +68,9 @@ DEFAULT_SQLSERVER_PATH = "d:\\install"
 # window操作系统超级账号,标准运维调用
 WINDOW_ADMIN_USER_FOR_CHECK = "Administrator"
 
+# linux操作系统超级账号,标准运维调用
+LINUX_ADMIN_USER_FOR_CHECK = "root"
+
 # tendisplus默认kvstorecount
 DEFAULT_TENDISPLUS_KVSTORECOUNT = 10
 
@@ -436,6 +439,7 @@ class DBActuatorActionEnum(str, StructuredEnum):
     PushChecksumConfig = EnumField("push-checksum-config", _("推送mysql-table-checksum配置"))
     PushNewDbBackupConfig = EnumField("push-new-db-backup-config", _("推送备份配置"))
     PushMySQLRotatebinlogConfig = EnumField("push-mysql-rotatebinlog-config", _("推送rotatebinlog配置"))
+    ChangeServerId = EnumField("change-server-id", _("change-server-id"))
 
 
 class RedisActuatorActionEnum(str, StructuredEnum):
@@ -480,6 +484,9 @@ class RedisActuatorActionEnum(str, StructuredEnum):
     CONFIG_SET = EnumField("config_set", _("config_set"))
     LOAD_MODULES = EnumField("load_modules", _("load_modules"))
     PREDIXY_ADD_MODULES_CMDS = EnumField("predixy_add_modules_cmds", _("predixy_add_modules_cmds"))
+    RESHAPE = EnumField("reshape", _("reshape"))
+    CLUSTER_RESET_FLUSH_MEET = EnumField("cluster_reset_flush_meet", _("cluster_reset_flush_meet"))
+    REPLICAS_FORCE_RESYNC = EnumField("replicas_force_resync", _("replicas_force_resync"))
 
 
 class MongoDBActuatorActionEnum(str, StructuredEnum):
@@ -916,6 +923,8 @@ class MySQLBackupFileTagEnum(str, StructuredEnum):
 
 class MongoDBBackupFileTagEnum(str, StructuredEnum):
     NORMAL_BACKUP = EnumField("normal_backup", _("常规备份(25天)"))
+    HALF_YEAR_BACKUP = EnumField("half_year_backup", _("6个月"))
+    A_YEAR_BACKUP = EnumField("a_year_backup", _("1年"))
     FOREVER_BACKUP = EnumField("forever_backup", _("长期备份(3年)"))
 
 
@@ -1085,12 +1094,6 @@ class TenDBBackUpLocation(str, StructuredEnum):
 
     REMOTE = EnumField("remote", _("remote"))
     SPIDER_MNT = EnumField("spider_mnt", _("spider_mnt"))
-
-
-class AccessType(str, StructuredEnum):
-    CLB = EnumField("clb", _("clb"))
-    POLARIS = EnumField("polaris", _("北极星"))
-    DNS = EnumField("dns", _("域名"))
 
 
 class TBinlogDumperAddType(str, StructuredEnum):

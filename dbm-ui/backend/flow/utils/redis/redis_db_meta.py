@@ -683,7 +683,7 @@ class RedisDBMeta(object):
             api.cluster.nosqlcomm.make_sync(cluster=cluster, tendisss=tendiss)
         return True
 
-    def instances_status_update(self) -> bool:
+    def instances_status_update(self, cluster_obj) -> bool:
         """
         Redis/Proxy 实例修改实例状态 {"ip":"","ports":[],"status":11}
         """
@@ -694,19 +694,23 @@ class RedisDBMeta(object):
                     machine__ip=self.cluster["meta_update_ip"], port__in=self.cluster["meta_update_ports"]
                 ).update(status=self.cluster["meta_update_status"])
             else:
-                StorageInstance.objects.filter(
-                    machine__ip=self.cluster["meta_update_ip"], port__in=self.cluster["meta_update_ports"]
-                ).update(status=self.cluster["meta_update_status"])
+                # 支持互切的 不修改状态，保持 running
+                if cluster_obj.cluster_type not in [
+                    ClusterType.TendisPredixyRedisCluster.value,
+                    ClusterType.TendisPredixyTendisplusCluster.value,
+                ]:
+                    StorageInstance.objects.filter(
+                        machine__ip=self.cluster["meta_update_ip"], port__in=self.cluster["meta_update_ports"]
+                    ).update(status=self.cluster["meta_update_status"])
         return True
 
     def instances_failover_4_scene(self) -> bool:
         """1.修改状态、2.切换角色"""
-        self.instances_status_update()
         # 获取cluster
-        cluster_id = self.cluster["cluster_id"]
-        cluster = Cluster.objects.get(id=cluster_id)
+        cluster_obj = Cluster.objects.get(id=int(self.cluster["cluster_id"]))
+        self.instances_status_update(cluster_obj)
         with atomic():
-            cc_manage, bk_host_ids = CcManage(self.cluster["bk_biz_id"], cluster.cluster_type), []
+            cc_manage, bk_host_ids = CcManage(int(self.cluster["bk_biz_id"]), cluster_obj.cluster_type), []
             for port in self.cluster["meta_update_ports"]:
                 old_master = StorageInstance.objects.get(
                     machine__ip=self.cluster["meta_update_ip"],
@@ -839,7 +843,7 @@ class RedisDBMeta(object):
         cluster_id = self.cluster["cluster_id"]
         cluster = Cluster.objects.get(id=cluster_id)
 
-        cc_manage = CcManage(self.cluster["bk_biz_id"], cluster.cluster_type)
+        cc_manage = CcManage(int(self.cluster["bk_biz_id"]), cluster.cluster_type)
         with atomic():
             for ins in self.cluster["role_swap_ins"]:
                 ins1 = StorageInstance.objects.get(
@@ -1199,6 +1203,7 @@ class RedisDBMeta(object):
                     for entry_obj in cluster.clusterentry_set.filter(role=ClusterEntryRole.SLAVE_ENTRY):
                         slave_domain = entry_obj.entry
                         entry_obj.storageinstance_set.add(new_slave_obj)
+                        entry_obj.storageinstance_set.remove(master_obj)
                         if old_slave_obj and old_slave_obj.ip_port != new_slave_obj.ip_port:
                             entry_obj.storageinstance_set.remove(old_slave_obj)
                     if slave_domain != "":
@@ -1801,7 +1806,7 @@ class RedisDBMeta(object):
                 cluster_entry.storageinstance_set.add(*storageinstances)
                 cluster_entry.save()
                 logger.info(
-                    _("redis集群:%s cluster_type:%s 新增 %s cluster_entry").format(
+                    _("redis集群:{} cluster_type:{} 新增 {} cluster_entry").format(
                         cluster.immute_domain, cluster.cluster_type, nodes_domain
                     )
                 )
@@ -1811,8 +1816,75 @@ class RedisDBMeta(object):
                 cluster_entry.storageinstance_set.add(*storageinstances)
                 cluster_entry.save()
                 logger.info(
-                    _("redis集群:%s cluster_type:%s 更新 cluster_entry:%s").format(
+                    _("redis集群:{} cluster_type:{} 更新 cluster_entry:{}").format(
                         cluster.immute_domain, cluster.cluster_type, cluster_entry.entry
                     )
                 )
         return True
+
+    @transaction.atomic
+    def swith_master_slave_for_cluster_faiover(self):
+        """
+        交换cluster集群的master和slave
+        cluster["switch_master_slave_pairs"]={
+            "cluster_id": 1,
+            "replication_pairs": [
+                {"master_ip": "a.a.a.a", "master_port": 30000, "slave_ip": "b.b.b.b", "slave_port": 30000},
+                {"master_ip": "a.a.a.a", "master_port": 30001, "slave_ip": "b.b.b.b", "slave_port": 30001}
+            ]
+        }
+        """
+        switch_master_slave_pairs = self.cluster["switch_master_slave_pairs"]
+        cluster = Cluster.objects.get(id=switch_master_slave_pairs["cluster_id"])
+        cc_manage = CcManage(cluster.bk_biz_id, cluster.cluster_type)
+        bk_host_ids = []
+        for replication_pair in switch_master_slave_pairs["replication_pairs"]:
+            master_ip = replication_pair["master_ip"]
+            master_port = replication_pair["master_port"]
+            slave_ip = replication_pair["slave_ip"]
+            slave_port = replication_pair["slave_port"]
+
+            master_obj = cluster.storageinstance_set.get(machine__ip=master_ip, port=master_port)
+            if not master_obj:
+                raise Exception(
+                    _("cluster:{} master实例 {}:{} 不存在").format(cluster.immute_domain, master_ip, master_port)
+                )
+
+            slave_obj = cluster.storageinstance_set.get(machine__ip=slave_ip, port=slave_port)
+            if not slave_obj:
+                raise Exception(_("cluster:{} slave实例 {}:{} 不存在").format(cluster.immute_domain, slave_ip, slave_port))
+
+            bk_host_ids.append(master_obj.machine.bk_host_id)
+            bk_host_ids.append(slave_obj.machine.bk_host_id)
+
+            new_master_obj = slave_obj
+            new_master_obj.instance_role = InstanceRole.REDIS_MASTER
+            new_master_obj.instance_inner_role = InstanceInnerRole.MASTER
+            new_master_obj.cluster_type = cluster.cluster_type
+            new_master_obj.save(update_fields=["instance_role", "instance_inner_role", "cluster_type"])
+
+            new_slave_obj = master_obj
+            new_slave_obj.instance_role = InstanceRole.REDIS_SLAVE
+            new_slave_obj.instance_inner_role = InstanceInnerRole.SLAVE
+            new_slave_obj.cluster_type = cluster.cluster_type
+            new_slave_obj.save(update_fields=["instance_role", "instance_inner_role", "cluster_type"])
+
+            StorageInstanceTuple.objects.filter(ejector=master_obj, receiver=slave_obj).update(
+                ejector=new_master_obj, receiver=new_slave_obj
+            )
+
+            for proxy in cluster.proxyinstance_set.all():
+                proxy.storageinstance.remove(master_obj)
+                proxy.storageinstance.add(new_master_obj)
+                proxy.save()
+            # 切换新master服务实例角色标签
+            cc_manage.add_label_for_service_instance(
+                bk_instance_ids=[new_master_obj.bk_instance_id],
+                labels_dict={"instance_role": InstanceRole.REDIS_MASTER.value},
+            )
+            # 切换新slave服务实例角色标签
+            cc_manage.add_label_for_service_instance(
+                bk_instance_ids=[new_slave_obj.bk_instance_id],
+                labels_dict={"instance_role": InstanceRole.REDIS_SLAVE.value},
+            )
+        cc_manage.update_host_properties(bk_host_ids)

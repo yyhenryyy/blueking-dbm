@@ -254,14 +254,6 @@ var (
 	`
 )
 
-// dbha账号权限sql
-var (
-	GRANT_DBHA_SQL = `
-	use [master]
-	GRANT CONTROL SERVER TO [%s] AS [sa]
-	`
-)
-
 // mssql_exporter账号权限
 var (
 	GRANT_MSSQL_EXPORTER_SQL = `
@@ -277,6 +269,8 @@ var (
 	END
 	CREATE USER ['+@username+'] FOR LOGIN ['+@username+']
 	EXEC sp_addrolemember N''db_datareader'', N'''+@username+'''
+	USE [master]
+	GRANT VIEW ANY DEFINITION TO ['+@username+']
 	USE [Monitor]
 	IF EXISTS (SELECT * FROM sys.sysusers WHERE name = '''+@username+''')
 	BEGIN

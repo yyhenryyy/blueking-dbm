@@ -60,17 +60,17 @@
   import { useI18n } from 'vue-i18n';
   import { useRequest } from 'vue-request';
 
-  import type TendbClusterModel from '@services/model/spider/tendbCluster';
+  import type TendbClusterModel from '@services/model/tendbcluster/tendbcluster';
   import { getMonitorUrls } from '@services/source/monitorGrafana';
-  import { getSpiderDetails } from '@services/source/spider';
+  import { getTendbclusterDetail } from '@services/source/tendbcluster';
 
   import { useGlobalBizs } from '@stores';
 
   import { ClusterTypes } from '@common/const';
 
-  import ClusterTopo from '@components/cluster-details/ClusterTopo.vue';
-  import ClusterEventChange from '@components/cluster-event-change/EventChange.vue';
-  import MonitorDashboard from '@components/cluster-monitor/MonitorDashboard.vue';
+  import ClusterTopo from '@views/db-manage/common/cluster-details/ClusterTopo.vue';
+  import ClusterEventChange from '@views/db-manage/common/cluster-event-change/EventChange.vue';
+  import MonitorDashboard from '@views/db-manage/common/cluster-monitor/MonitorDashboard.vue';
 
   import { checkDbConsole } from '@utils';
 
@@ -101,7 +101,7 @@
     return targetPanel;
   });
 
-  const { loading: isLoading, run: fetchResourceDetails } = useRequest(getSpiderDetails, {
+  const { loading: isLoading, run: fetchResourceDetails } = useRequest(getTendbclusterDetail, {
     manual: true,
     onSuccess(data) {
       clusterData.value = data;

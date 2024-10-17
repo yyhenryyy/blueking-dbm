@@ -14,6 +14,8 @@ import InfoBox from 'bkui-vue/lib/info-box';
 
 import TicketModel from '@services/model/ticket/ticket';
 import TicketFlowDescribeModel from '@services/model/ticket-flow-describe/TicketFlowDescribe';
+import type { HostNode, ListBase } from '@services/types';
+import type { FlowItem, FlowItemTodo } from '@services/types/ticket';
 
 import { getRouter } from '@router/index';
 
@@ -22,8 +24,6 @@ import { messageError } from '@utils';
 import { locale, t } from '@locales/index';
 
 import http, { type IRequestPayload } from '../http';
-import type { HostNode, ListBase } from '../types';
-import type { FlowItem, FlowItemTodo } from '../types/ticket';
 
 const path = '/apis/tickets';
 
@@ -37,6 +37,11 @@ export function getTickets(
     status?: string;
     limit?: number;
     offset?: number;
+    create_at__lte?: string;
+    create_at__gte?: string;
+    remark?: string;
+    creator?: string;
+    cluster?: string;
   } = {},
 ) {
   return http.get<ListBase<TicketModel<unknown>[]>>(`${path}/`, params).then((data) => ({
@@ -46,37 +51,11 @@ export function getTickets(
 }
 
 /**
- * 单据列表项
- */
-interface TicketItem {
-  db_app_abbr: string;
-  bk_biz_id: number;
-  bk_biz_name: string;
-  cost_time: number;
-  create_at: string;
-  creator: string;
-  details: any;
-  id: number;
-  remark: string;
-  status: string;
-  status_display: string;
-  ticket_type: string;
-  ticket_type_display: string;
-  update_at: string;
-  updater: string;
-  is_reviewed: boolean;
-  related_object: {
-    title: string;
-    objects: string[];
-  };
-}
-
-/**
  * 创建单据
  */
 export function createTicket(formData: Record<string, any>) {
   return http
-    .post<TicketItem>(`${path}/`, formData, { catchError: true })
+    .post<{ id: number }>(`${path}/`, formData, { catchError: true })
     .then((res) => res)
     .catch((e) => {
       const { code, data } = e;
@@ -84,14 +63,16 @@ export function createTicket(formData: Record<string, any>) {
       if (code === duplicateCode) {
         const id = data.duplicate_ticket_id;
         const router = getRouter();
+
         console.log('router = ', router);
+
         const route = router.resolve({
           name: 'bizTicketManage',
           query: {
             id,
           },
         });
-        return new Promise((resolve: (value: TicketItem) => void, reject) => {
+        return new Promise<{ id: number }>((resolve, reject) => {
           InfoBox({
             title: t('是否继续提交单据'),
             content: () => {
@@ -212,6 +193,11 @@ export function getTodoTickets(
     status?: string;
     limit?: number;
     offset?: number;
+    create_at__lte?: string;
+    create_at__gte?: string;
+    remark?: string;
+    creator?: string;
+    cluster?: string;
   } = {},
 ) {
   return http.get<ListBase<TicketModel<unknown>[]>>(`${path}/get_todo_tickets/`, params).then((data) => ({

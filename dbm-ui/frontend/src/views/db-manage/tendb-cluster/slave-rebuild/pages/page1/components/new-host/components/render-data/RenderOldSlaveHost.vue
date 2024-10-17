@@ -27,7 +27,7 @@
   import _ from 'lodash';
   import { useI18n } from 'vue-i18n';
 
-  import { getSpiderMachineList } from '@services/source/spider';
+  import { getTendbclusterMachineList } from '@services/source/tendbcluster';
 
   import { ipv4 } from '@common/regex';
 
@@ -71,7 +71,7 @@
     },
     {
       validator: (value: string) =>
-        getSpiderMachineList({
+        getTendbclusterMachineList({
           ip: value,
           instance_role: 'remote_slave',
         }).then((data) => {
@@ -145,7 +145,7 @@
 
   defineExpose<Exposes>({
     validate() {
-      return editRef.value!.getValue();
+      return editRef.value!.getValue().catch(() => Promise.reject(localValue.value));
     },
   });
 </script>

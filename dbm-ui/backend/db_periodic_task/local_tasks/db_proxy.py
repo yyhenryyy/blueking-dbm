@@ -64,7 +64,7 @@ def fill_cluster_service_nginx_conf():
         job_payload["callback_url"] = f"{env.BK_SAAS_CALLBACK_URL}/apis/proxypass/push_conf_callback/"
 
         logger.info(_("nginx配置文件下发参数：{}").format(job_payload))
-        _resp = JobApi.push_config_file(job_payload, raw=True)
+        _resp = JobApi.push_config_file(job_payload, raw=True, use_admin=True)
         if not _resp["result"]:
             raise ProxyPassBaseException(_("下发文件job启动失败，错误信息: {}").format(_resp["message"]))
 
@@ -103,7 +103,7 @@ def fill_cluster_service_nginx_conf():
 
             for extension in cloud__db_type__extension[cloud_id][db_type]:
                 # 渲染配置
-                file_list.append(nginxconf_tpl.render_nginx_tpl(template, extension, encode=True))
+                file_list.append(nginxconf_tpl.render_nginx_tpl(extension=extension, template=template, encode=True))
                 # 这里先提前写入access url，至于是否执行成功根据is_flush
                 extension.save_access_url(nginx_url=f"{proxy.external_address}:{manage_port}")
                 extension_ids.append(extension.id)

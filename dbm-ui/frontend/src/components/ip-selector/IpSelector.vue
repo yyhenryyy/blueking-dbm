@@ -116,7 +116,7 @@
 
   import { checkHost, getHostDetails, getHosts, getHostTopo } from '@services/source/ipchooser';
   import { getWhitelist } from '@services/source/whitelist';
-  import type { HostDetails } from '@services/types';
+  import type { HostInfo } from '@services/types';
 
   import { useCopy, useFormItem } from '@hooks';
 
@@ -129,12 +129,10 @@
 
   import PreviewWhitelist from './components/PreviewWhitelist.vue';
 
-  import type { TableColumnRender } from '@/types/bkui-vue';
-
   /** IP 选择器返回结果 */
   export type IPSelectorResult = {
     dynamic_group_list: any[];
-    host_list: Array<HostDetails>;
+    host_list: Array<HostInfo>;
     node_list: any[];
     dbm_whitelist: any[];
   };
@@ -146,7 +144,7 @@
     buttonText?: string;
     searchPlaceholder?: string;
     tableProps?: TablePropTypes;
-    data?: HostDetails[];
+    data?: HostInfo[];
     title?: string;
     showView?: boolean;
     required?: boolean;
@@ -162,7 +160,7 @@
   }
 
   interface Emits {
-    (e: 'change', value: (typeof selectorState)['tableData']): void;
+    (e: 'change', value: any[]): void;
     (e: 'changeWhitelist', value: IPSelectorResult['dbm_whitelist']): void;
   }
 </script>
@@ -312,14 +310,12 @@
     fetchTopologyHostCount: (node: any) => getHostTopo({
       mode: props.serviceMode,
       all_scope: true,
-      // scope_list: !node ? [] : [node.meta],
       scope_list: [scope.value],
     }),
     fetchHostsDetails: (params: any) => {
       const firstHost = params.host_list[0];
       return getHostDetails({
         mode: props.serviceMode,
-        // scope_list: [firstHost.meta],
         scope_list: [scope.value],
         ...params,
       });
@@ -406,56 +402,56 @@
       {
         label: t('管控区域'),
         field: 'cloud_area',
-        render: ({ cell }: any) => <span>{cell?.name || '--'}</span>,
+        render: ({data}: {data: HostInfo}) => data.cloud_area || '--',
       },
       {
         label: t('Agent状态'),
         field: 'alive',
-        render: ({ cell }: { cell: number }) => {
-          const info = cell === 1 ? { theme: 'success', text: t('正常') } : { theme: 'danger', text: t('异常') };
+        render: ({data}: {data: HostInfo}) => {
+          const info = data.alive === 1 ? { theme: 'success', text: t('正常') } : { theme: 'danger', text: t('异常') };
           return <DbStatus theme={info.theme}>{info.text}</DbStatus>;
         },
       },
       {
         label: t('主机名称'),
         field: 'host_name',
-        render: ({ cell }: TableColumnRender) => <span>{cell || '--'}</span>,
+        render: ({data}: {data: HostInfo}) => data.host_name || '--',
       },
       {
         label: t('OS名称'),
         field: 'os_name',
-        render: ({ cell }: TableColumnRender) => <span>{cell || '--'}</span>,
+        render: ({data}: {data: HostInfo}) => data.os_name || '--',
       },
       {
         label: t('所属云厂商'),
         field: 'cloud_vendor',
-        render: ({ cell }: TableColumnRender) => <span>{cell || '--'}</span>,
+        render: ({data}: {data: HostInfo}) => data.cloud_vendor || '--',
       },
       {
         label: t('OS类型'),
         field: 'os_type',
-        render: ({ cell }: TableColumnRender) => <span>{cell || '--'}</span>,
+        render: ({data}: {data: HostInfo}) => data.os_type || '--',
       },
       {
         label: t('主机ID'),
         field: 'host_id',
-        render: ({ cell }: TableColumnRender) => <span>{cell || '--'}</span>,
+        render: ({data}: {data: HostInfo}) => data.host_id || '--',
       },
       {
         label: 'Agent ID',
         field: 'agent_id',
-        render: ({ cell }: TableColumnRender) => <span>{cell || '--'}</span>,
+        render: ({data}: {data: HostInfo}) => data.agent_id || '--',
       },
       {
         label: 'IPv6',
         field: 'ipv6',
-        render: ({ cell }: TableColumnRender) => <span>{cell || '--'}</span>,
+        render: ({data}: {data: HostInfo}) => data.ipv6 || '--',
       },
       {
         label: t('操作'),
         field: 'operation',
         width: 100,
-        render: ({ index }: TableColumnRender) => (
+        render: ({ index }: {index: number}) => (
           <bk-button
             text
             theme="primary"
@@ -527,7 +523,7 @@
         host_id: item.host_id,
         meta: {
           bk_biz_id: props.bizId as number,
-          scope_id: props.bizId as number,
+          scope_id: `${props.bizId}`,
           scope_type: 'biz',
         },
       })),

@@ -111,7 +111,7 @@ func CalServerDataSize(port int) (uint64, error) {
 	cmdStr := "du -sb " + datadir + "/.."
 	res, err := exec.Command("/bin/bash", "-c", cmdStr).CombinedOutput()
 	if err != nil {
-		return 0, err
+		return 0, errors.WithMessage(err, string(res))
 	}
 	datasize := strings.Replace(string(res), "\n", "", -1)
 	words := strings.Fields(datasize)
@@ -134,6 +134,9 @@ func CalBackupDataSize() (uint64, error) {
 func DiskUsage(path string) (disk DiskStatus, err error) {
 	switch runtime.GOOS {
 	case "linux":
+		if realPath, _ := os.Readlink(path); realPath != "" {
+			path = realPath
+		}
 		fs := syscall.Statfs_t{}
 		err = syscall.Statfs(path, &fs)
 		if err != nil {

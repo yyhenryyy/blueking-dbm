@@ -14,7 +14,6 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	"dbm-services/common/go-pubpkg/mysqlcomm"
 	"fmt"
 	"io"
 	"os"
@@ -25,6 +24,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+
+	"dbm-services/common/go-pubpkg/mysqlcomm"
 
 	"dbm-services/common/go-pubpkg/logger"
 	"dbm-services/mysql/db-tools/dbactuator/pkg/core/cst"
@@ -130,9 +131,12 @@ func (e ExecuteSqlAtLocal) ExcuteCommand(command string, report bool) (err error
 	}
 	defer ef.Close()
 	defer ef.Sync()
+	// 标准输出复制一份到错误文件中
 	stdout := io.MultiWriter(os.Stdout)
-
-	stderr := io.MultiWriter(os.Stderr, &stderrBuf, ef)
+	//stdout := io.MultiWriter(os.Stdout, ef)
+	// 错误不输出控制台 去掉os.Stderr
+	// stderr := io.MultiWriter(os.Stderr, &stderrBuf, ef)
+	stderr := io.MultiWriter(&stderrBuf, ef)
 	if !report {
 		stderr = io.MultiWriter(&stderrBuf, ef)
 	}
@@ -150,6 +154,7 @@ func (e ExecuteSqlAtLocal) ExcuteCommand(command string, report bool) (err error
 		wg.Done()
 	}()
 
+	// 管道stderrIn输出到stderr。stderr又写到&stderrBuf、ef
 	_, errStderr = io.Copy(stderr, stderrIn)
 
 	wg.Wait()

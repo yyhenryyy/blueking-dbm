@@ -36,7 +36,9 @@
     </td>
     <OperateColumn
       :removeable="removeable"
+      show-clone
       @add="handleAppend"
+      @clone="handleClone"
       @remove="handleRemove" />
   </tr>
 </template>
@@ -64,7 +66,8 @@
       instanceAddress: string;
       masterDomain: string;
     };
-    target?: IProxyData;
+    // target?: IProxyData;
+    target?: string;
   }
 
   // 创建表格数据
@@ -75,7 +78,7 @@
   });
 </script>
 <script setup lang="ts">
-  import type SpiderModel from '@services/model/spider/spider';
+  import type SpiderModel from '@services/model/tendbcluster/tendbcluster';
 
   import RenderCluster from './RenderCluster.vue';
   import RenderModule from './RenderModule.vue';
@@ -89,6 +92,7 @@
   interface Emits {
     (e: 'add', params: Array<IDataRow>): void;
     (e: 'remove'): void;
+    (e: 'clone', value: IDataRow): void;
   }
 
   interface Exposes {
@@ -133,6 +137,19 @@
       return;
     }
     emits('remove');
+  };
+
+  const handleClone = () => {
+    Promise.allSettled([targetRef.value.getValue()]).then((rowData) => {
+      const [targetData] = rowData.map((item) => (item.status === 'fulfilled' ? item.value : item.reason));
+      emits(
+        'clone',
+        createRowData({
+          source: props.data.source,
+          target: targetData.target,
+        }),
+      );
+    });
   };
 
   defineExpose<Exposes>({

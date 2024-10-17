@@ -12,6 +12,7 @@ import copy
 import datetime
 import json
 import logging
+import os
 from collections import defaultdict
 from typing import Any, Dict, List
 
@@ -35,14 +36,25 @@ from backend.db_monitor.constants import (
     DEFAULT_ALERT_NOTICE,
     PLAT_PRIORITY,
     TARGET_LEVEL_TO_PRIORITY,
+    TPLS_ALARM_DIR,
     AlertSourceEnum,
     DutyRuleCategory,
     PolicyStatus,
     TargetLevel,
+    TargetPriority,
 )
-from backend.db_monitor.exceptions import BkMonitorDeleteAlarmException, BuiltInNotAllowDeleteException
+from backend.db_monitor.exceptions import (
+    BkMonitorDeleteAlarmException,
+    BkMonitorSaveAlarmException,
+    BuiltInNotAllowDeleteException,
+)
 from backend.db_monitor.tasks import update_app_policy
-from backend.db_monitor.utils import bkm_delete_alarm_strategy, bkm_save_alarm_strategy, render_promql_sql
+from backend.db_monitor.utils import (
+    bkm_delete_alarm_strategy,
+    bkm_save_alarm_strategy,
+    get_dbm_autofix_action_id,
+    render_promql_sql,
+)
 from backend.exceptions import ApiError
 
 __all__ = ["NoticeGroup", "AlertRule", "RuleTemplate", "DispatchGroup", "MonitorPolicy", "DutyRule"]
@@ -409,45 +421,44 @@ class DispatchGroup(AuditedModel):
     @classmethod
     def get_rules_by_dbtype(cls, db_type, bk_biz_id) -> List[Dict[str, Any]]:
         """根据db类型生成规则"""
-        conditions = []
-        # 仅分派平台策略
-        policies = MonitorPolicy.get_policies(db_type)
+        rules = []
 
-        # 排除无效的db类型，比如cloud
-        if not policies:
-            return []
-
-        conditions.append({"field": "alert.strategy_id", "value": policies, "method": "eq", "condition": "and"})
         user_groups = [NoticeGroup.get_groups(bk_biz_id).get(db_type)]
-
-        # 业务级分派策略
-        if bk_biz_id != PLAT_BIZ_ID:
-            conditions.append({"field": "appid", "value": [str(bk_biz_id)], "method": "eq", "condition": "and"})
-
-        rules = [
-            {
-                "user_groups": user_groups,
-                "conditions": conditions,
-                **BK_MONITOR_DISPATCH_RULE_MIXIN,
-            }
-        ]
-
-        # 补充 dbha 特殊策略的分派规则
-        if db_type in [DBType.MySQL, DBType.Redis, DBType.Sqlserver]:
-            policies = MonitorPolicy.get_dbha_policies()
+        # 特殊策略需要独立分派
+        dispatch_policies = MonitorPolicy.get_dispatch_policies()
+        if db_type in [DBType.MySQL, DBType.TenDBCluster, DBType.Redis, DBType.Sqlserver]:
+            conditions = [
+                {"field": "alert.strategy_id", "method": "eq", "value": dispatch_policies, "condition": "and"},
+                {
+                    "field": "cluster_type",
+                    "method": "eq",
+                    "value": ClusterType.db_type_to_cluster_types(db_type),
+                    "condition": "and",
+                },
+            ]
+            if bk_biz_id != PLAT_BIZ_ID:
+                conditions.append({"field": "appid", "method": "eq", "value": [str(bk_biz_id)], "condition": "and"})
             rules.append(
                 {
                     "user_groups": user_groups,
-                    "conditions": [
-                        {"field": "alert.strategy_id", "method": "eq", "value": policies, "condition": "and"},
-                        {
-                            "field": "cluster_type",
-                            "method": "eq",
-                            "value": ClusterType.db_type_to_cluster_types(db_type),
-                            "condition": "and",
-                        },
-                        {"field": "appid", "method": "eq", "value": [str(bk_biz_id)], "condition": "and"},
-                    ],
+                    "conditions": conditions,
+                    **BK_MONITOR_DISPATCH_RULE_MIXIN,
+                }
+            )
+
+        # 仅分派平台策略，排除掉需要特殊分派的策略
+        policies = list(set(MonitorPolicy.get_policies(db_type)) - set(dispatch_policies))
+        if policies:
+            conditions = [{"field": "alert.strategy_id", "value": policies, "method": "eq", "condition": "and"}]
+
+            # 业务级分派策略
+            if bk_biz_id != PLAT_BIZ_ID:
+                conditions.append({"field": "appid", "value": [str(bk_biz_id)], "method": "eq", "condition": "and"})
+
+            rules.append(
+                {
+                    "user_groups": user_groups,
+                    "conditions": conditions,
                     **BK_MONITOR_DISPATCH_RULE_MIXIN,
                 }
             )
@@ -673,9 +684,9 @@ class MonitorPolicy(AuditedModel):
         items = details["items"]
         # 事件类告警，无需设置告警目标，否则要求上报的数据必须携带服务实例id（告警目标匹配依据）
         for item in items:
-            # 更新监控目标为db_type对应的cmdb拓扑，其中 DBHA 的策略，无需添加目标
+            # 更新监控目标为db_type对应的cmdb拓扑，其中标签 NO_MONITOR_TARGET 的策略，无需添加监控目标
             objs = AppMonitorTopo.get_set_by_dbtype(db_type=db_type)
-            if objs and "DBHA_SWITCH" not in details["labels"]:
+            if objs and "NO_MONITOR_TARGET" not in details["labels"]:
                 item["target"] = [
                     [
                         {
@@ -990,10 +1001,115 @@ class MonitorPolicy(AuditedModel):
         return policy_ids
 
     @classmethod
-    def get_dbha_policies(cls):
-        """获取高可用策略id列表"""
+    def get_dispatch_policies(cls):
+        """获取需独立分派的特殊策略"""
         return list(
-            cls.objects.filter(details__labels__contains=["/DBM_DBHA/"]).values_list("monitor_policy_id", flat=True)
+            cls.objects.filter(details__labels__contains=["/DBM_NEED_DISPATCH/"]).values_list(
+                "monitor_policy_id", flat=True
+            )
+        )
+
+    @classmethod
+    def sync_plat_monitor_policy(cls, action_id=None, db_type=None, force=False):
+        if action_id is None:
+            action_id = get_dbm_autofix_action_id()
+        skip_dir = "v1"
+        now = datetime.datetime.now(timezone.utc)
+        logger.warning("[sync_plat_monitor_policy] sync bkm alarm policy start: %s", now)
+
+        # 逐个json导入，本地+远程
+        updated_policies = 0
+        for root, dirs, files in os.walk(TPLS_ALARM_DIR):
+            if skip_dir in dirs:
+                dirs.remove(skip_dir)
+
+            for alarm_tpl in files:
+
+                with open(os.path.join(root, alarm_tpl), "r", encoding="utf-8") as f:
+                    logger.info("[sync_plat_monitor_policy] start sync bkm alarm tpl: %s " % alarm_tpl)
+                    try:
+                        template_dict = json.loads(f.read())
+                        # 监控API不支持传入额外的字段
+                        template_dict.pop("export_at", "")
+                        policy_name = template_dict["name"]
+                    except json.decoder.JSONDecodeError:
+                        logger.error("[sync_plat_monitor_policy] load template failed: %s", alarm_tpl)
+                        continue
+
+                    # 如指定db_type，只同步指定db_type的策略(跳过非指定db_type的策略)
+                    if db_type is not None and template_dict["db_type"] != db_type:
+                        continue
+
+                    deleted = template_dict.pop("deleted", False)
+
+                    if not template_dict.get("details"):
+                        logger.error(("[sync_plat_monitor_policy] template %s has no details" % alarm_tpl))
+                        continue
+
+                    # patch template
+                    labels = list(set(template_dict["details"]["labels"]))
+                    template_dict["details"]["labels"] = labels
+                    template_dict["details"]["name"] = policy_name
+                    template_dict["details"]["priority"] = TargetPriority.PLATFORM.value
+                    # 平台策略仅开启基于分派通知
+                    template_dict["details"]["notice"]["options"]["assign_mode"] = ["by_rule"]
+                    for label in labels:
+                        if label.startswith("NEED_AUTOFIX") and action_id is not None:
+                            template_dict["details"]["actions"] = [
+                                {
+                                    "config_id": action_id,
+                                    "signal": ["abnormal"],
+                                    "user_groups": [],
+                                    "options": {
+                                        "converge_config": {
+                                            "is_enabled": False,
+                                            "converge_func": "skip_when_success",
+                                            "timedelta": 60,
+                                            "count": 1,
+                                        }
+                                    },
+                                }
+                            ]
+
+                    policy = MonitorPolicy(**template_dict)
+
+                policy_name = policy.name
+                logger.info("[sync_plat_monitor_policy] start sync bkm alarm policy: %s " % policy_name)
+                try:
+                    synced_policy = MonitorPolicy.objects.get(bk_biz_id=policy.bk_biz_id, name=policy_name)
+
+                    if deleted:
+                        logger.info("[sync_plat_monitor_policy] delete old alarm: %s " % policy_name)
+                        synced_policy.delete()
+                        continue
+
+                    if synced_policy.version >= policy.version and not force:
+                        logger.info("[sync_plat_monitor_policy] skip same version alarm: %s " % policy_name)
+                        continue
+
+                    for keeped_field in MonitorPolicy.KEEPED_FIELDS:
+                        setattr(policy, keeped_field, getattr(synced_policy, keeped_field))
+
+                    policy.details["id"] = synced_policy.monitor_policy_id
+                    logger.info("[sync_plat_monitor_policy] update bkm alarm policy: %s " % policy_name)
+                except MonitorPolicy.DoesNotExist:
+                    logger.info("[sync_plat_monitor_policy] create bkm alarm policy: %s " % policy_name)
+
+                try:
+                    # fetch targets/test_rules/notify_rules/notify_groups from parent details
+                    for attr, value in policy.parse_details().items():
+                        setattr(policy, attr, value)
+
+                    policy.save()
+                    updated_policies += 1
+                    logger.error("[sync_plat_monitor_policy] save bkm alarm policy success: %s", policy_name)
+                except BkMonitorSaveAlarmException as e:
+                    logger.error("[sync_plat_monitor_policy] save bkm alarm policy failed: %s, %s ", policy_name, e)
+
+        logger.warning(
+            "[sync_plat_monitor_policy] finish sync bkm alarm policy end: %s, update_cnt: %s",
+            datetime.datetime.now(timezone.utc) - now,
+            updated_policies,
         )
 
     @staticmethod

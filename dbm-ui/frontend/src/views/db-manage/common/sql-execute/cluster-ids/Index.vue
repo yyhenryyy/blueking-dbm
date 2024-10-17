@@ -42,16 +42,6 @@
       @change="handelClusterChange" />
   </div>
 </template>
-<script lang="tsx">
-  export interface IClusterData {
-    id: number;
-    cluster_name: string;
-    status: string;
-    major_version: string;
-    master_domain: string;
-    cluster_type: string;
-  }
-</script>
 <script setup lang="tsx">
   import _ from 'lodash';
   import { useI18n } from 'vue-i18n';
@@ -62,8 +52,17 @@
 
   import { ClusterTypes } from '@common/const';
 
-  import RenderClusterStatus from '@components/cluster-common/RenderStatus.vue';
   import ClusterSelector from '@components/cluster-selector/Index.vue';
+  import RenderClusterStatus from '@components/cluster-status/Index.vue';
+
+  interface IClusterData {
+    id: number;
+    cluster_name: string;
+    status: string;
+    major_version: string;
+    master_domain: string;
+    cluster_type: string;
+  }
 
   interface Props {
     clusterTypeList: ClusterTypes[]

@@ -116,8 +116,8 @@
   import { useRequest } from 'vue-request';
   import { useRoute, useRouter } from 'vue-router';
 
-  import MysqlPermissonAccountModel from '@services/model/mysql-permisson/mysql-permission-account';
-  import SpiderModel from '@services/model/spider/tendbCluster';
+  import MysqlPermissonAccountModel from '@services/model/mysql/mysql-permission-account';
+  import TendbclusterModel from '@services/model/tendbcluster/tendbcluster';
   import { create as createOpenarea, getDetail, update as updateOpenarea } from '@services/source/openarea';
   import { getPermissionRules } from '@services/source/permission';
 
@@ -127,9 +127,10 @@
 
   import { ClusterTypes } from '@common/const';
 
-  import PermissionRule from '@components/add-permission-rule-dialog/Index.vue';
   import ClusterSelector, { type TabConfig } from '@components/cluster-selector/Index.vue';
   import TextOverflowLayout from '@components/text-overflow-layout/Index.vue';
+
+  import PermissionRule from '@views/db-manage/common/add-permission-rule-dialog/Index.vue';
 
   import { messageSuccess } from '@utils';
 
@@ -170,7 +171,7 @@
     domain: '',
   });
 
-  const clusterSelectorValue = shallowRef<Record<string, SpiderModel[]>>({
+  const clusterSelectorValue = shallowRef<Record<string, TendbclusterModel[]>>({
     [ClusterTypes.TENDBCLUSTER]: []
   });
 
@@ -332,7 +333,7 @@
     isShowClusterSelector.value = true;
   };
 
-  const handelClusterChange = (selected: Record<string, SpiderModel[]>) => {
+  const handelClusterChange = (selected: Record<string, TendbclusterModel[]>) => {
     clusterSelectorValue.value = selected;
 
     const { id, master_domain: domain, cluster_type: clusterType } = selected[ClusterTypes.TENDBCLUSTER][0];

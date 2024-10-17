@@ -329,30 +329,28 @@
   import { useI18n } from 'vue-i18n';
   import { useRoute, useRouter } from 'vue-router';
 
-  import type { BizItem, HostDetails } from '@services/types';
+  import type { BizItem, HostInfo } from '@services/types';
 
   import { useApplyBase } from '@hooks';
 
-  // import AffinityItem from '@components/apply-items/AffinityItem.vue';
   import { OSTypes } from '@common/const';
 
-  import BusinessItems from '@components/apply-items/BusinessItems.vue';
-  import CloudItem from '@components/apply-items/CloudItem.vue';
-  import ClusterAlias from '@components/apply-items/ClusterAlias.vue';
-  import ClusterName from '@components/apply-items/ClusterName.vue';
-  import DeployVersion from '@components/apply-items/DeployVersion.vue';
-  import RegionItem from '@components/apply-items/RegionItem.vue';
-  import SpecSelector from '@components/apply-items/SpecSelector.vue';
-  import RenderHostTable, {
-    type IHostTableData,
-  } from '@components/cluster-common/big-data-host-table/RenderHostTable.vue';
   import IpSelector from '@components/ip-selector/IpSelector.vue';
+
+  import BusinessItems from '@views/db-manage/common/apply-items/BusinessItems.vue';
+  import CloudItem from '@views/db-manage/common/apply-items/CloudItem.vue';
+  import ClusterAlias from '@views/db-manage/common/apply-items/ClusterAlias.vue';
+  import ClusterName from '@views/db-manage/common/apply-items/ClusterName.vue';
+  import DeployVersion from '@views/db-manage/common/apply-items/DeployVersion.vue';
+  import RegionItem from '@views/db-manage/common/apply-items/RegionItem.vue';
+  import SpecSelector from '@views/db-manage/common/apply-items/SpecSelector.vue';
+  import RenderHostTable from '@views/db-manage/common/big-data-host-table/RenderHostTable.vue';
 
   const route = useRoute();
   const router = useRouter();
   const { t } = useI18n();
 
-  const formatIpData = (data: HostDetails[]) =>
+  const formatIpData = (data: HostInfo[]) =>
     data.map((item) => ({
       ...item,
       instance_num: 1,
@@ -372,8 +370,8 @@
       ip_source: 'resource_pool',
       disaster_tolerance_level: 'NONE', // 同 affinity
       nodes: {
-        zookeeper: [] as Array<IHostTableData>,
-        broker: [] as Array<IHostTableData>,
+        zookeeper: [] as Array<HostInfo>,
+        broker: [] as Array<HostInfo>,
       },
       resource_spec: {
         zookeeper: {
@@ -509,11 +507,11 @@
     formData.details.nodes.broker = [];
   }
 
-  const handleZookeeperChange = (data: HostDetails[]) => {
+  const handleZookeeperChange = (data: HostInfo[]) => {
     formData.details.nodes.zookeeper = formatIpData(data);
   };
 
-  const handleBrokerChange = (data: HostDetails[]) => {
+  const handleBrokerChange = (data: HostInfo[]) => {
     formData.details.nodes.broker = formatIpData(data);
   };
 
@@ -521,7 +519,7 @@
   const handleSubmit = () => {
     formRef.value.validate().then(() => {
       baseState.isSubmitting = true;
-      const mapIpField = (ipList: Array<IHostTableData>) =>
+      const mapIpField = (ipList: Array<HostInfo>) =>
         ipList.map((item) => ({
           bk_host_id: item.host_id,
           ip: item.ip,

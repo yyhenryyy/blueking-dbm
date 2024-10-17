@@ -67,19 +67,6 @@
     </BkLoading>
   </div>
 </template>
-<script lang="tsx">
-  export interface IPagination {
-    count: number;
-    current: number;
-    limit: number;
-    limitList: Array<number>;
-    align: string;
-    layout: Array<string>;
-  }
-  export interface IPaginationExtra {
-    small?: boolean;
-  }
-</script>
 <script setup lang="tsx">
   import type { Table } from 'bkui-vue';
   import _ from 'lodash';
@@ -104,11 +91,13 @@
   import { getOffset } from '@utils';
 
   interface Props {
-    columns: InstanceType<typeof Table>['$props']['columns'],
+    columns?: InstanceType<typeof Table>['$props']['columns'],
     dataSource: (params: any, payload?: IRequestPayload)=> Promise<any>,
     fixedPagination?: boolean,
     clearSelection?: boolean,
-    paginationExtra?: IPaginationExtra,
+    paginationExtra?: {
+    small?: boolean;
+  },
     selectable?: boolean,
     disableSelectMethod?: (data: any) => boolean|string,
     // data 数据的主键
@@ -133,7 +122,7 @@
   }
 
   interface Exposes {
-    fetchData: (params: Record<string, any>, baseParams: Record<string, any>, loading?: boolean) => void,
+    fetchData: (params?: Record<string, any>, baseParams?: Record<string, any>, loading?: boolean) => void,
     getData: <T>() => Array<T>,
     getAllData: <T>() => Promise<Array<T>>,
     clearSelected: () => void,
@@ -239,7 +228,14 @@
   const isAnomalies = ref(false);
   const rowSelectMemo = shallowRef<Record<string|number, Record<any, any>>>({});
   const isWholeChecked = ref(false);
-  const pagination = reactive<IPagination>({
+  const pagination = reactive<{
+    count: number;
+    current: number;
+    limit: number;
+    limitList: Array<number>;
+    align: string;
+    layout: Array<string>;
+  }>({
     count: 0,
     current: 1,
     limit: 10,
@@ -327,6 +323,7 @@
         props.dataSource(params, payload)
           .then((data) => {
             tableData.value = data;
+            console.log('tabledata = ', data);
             pagination.count = data.count;
             isSearching.value = getSearchingStatus();
             isAnomalies.value = false;
@@ -528,6 +525,7 @@
   // 切换每页条数
   const handlePageLimitChange = (pageLimit: number) => {
     pagination.limit = pageLimit;
+    pagination.current = 1;
     fetchListData();
   };
 

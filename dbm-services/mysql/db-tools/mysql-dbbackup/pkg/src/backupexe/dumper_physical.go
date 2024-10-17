@@ -1,6 +1,7 @@
 package backupexe
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -190,11 +191,8 @@ func (p *PhysicalDumper) Execute(enableTimeOut bool) error {
 			fmt.Sprintf(`%s %s`, binPath, strings.Join(args, " ")))
 	}
 
-	outFile, err := os.Create(
-		filepath.Join(
-			p.dbbackupHome,
-			"logs",
-			fmt.Sprintf("xtrabackup_%d_%d.log", p.cnf.Public.MysqlPort, int(time.Now().Weekday()))))
+	outFile, err := os.Create(filepath.Join(logger.GetLogDir(),
+		fmt.Sprintf("xtrabackup_%d_%d.log", p.cnf.Public.MysqlPort, int(time.Now().Weekday()))))
 	if err != nil {
 		logger.Log.Error("create log file failed: ", err)
 		return err
@@ -204,13 +202,15 @@ func (p *PhysicalDumper) Execute(enableTimeOut bool) error {
 	}()
 
 	cmd.Stdout = outFile
-	cmd.Stderr = outFile
+	//cmd.Stderr = outFile
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	logger.Log.Info("xtrabackup command: ", cmd.String())
 
 	err = cmd.Run()
 	if err != nil {
-		logger.Log.Error("run physical backup failed: ", err)
-		return err
+		logger.Log.Error("run physical backup failed: ", err, stderr.Bytes())
+		return errors.WithMessage(err, stderr.String())
 	}
 	return nil
 }
@@ -258,14 +258,15 @@ func (p *PhysicalDumper) PrepareBackupMetaInfo(cnf *config.BackupConfig) (*dbare
 	}
 	// parse xtrabackup_info
 	if err = parseXtraInfo(qpressPath, xtrabackupInfoFileName, tmpFileName, &metaInfo); err != nil {
-		logger.Log.Warnf("xtrabackup_info file not found, use current time as BackupEndTime")
+		logger.Log.Warnf("xtrabackup_info file not found, use current time as BackupEndTime, err: %s", err.Error())
 		metaInfo.BackupBeginTime, _ = time.Parse(time.DateTime, p.backupStartTime.Format(time.DateTime))
 		metaInfo.BackupEndTime, _ = time.Parse(time.DateTime, p.backupEndTime.Format(time.DateTime))
 	}
 	// parse xtrabackup_timestamp_info
 	if err := parseXtraTimestamp(qpressPath, xtrabackupTimestampFileName, tmpFileName, &metaInfo); err != nil {
 		// 此时刚备份完成，还没有开始打包，这里把当前时间认为是 consistent_time，不完善！
-		logger.Log.Warnf("xtrabackup_timestamp_info file not found, use current time as Consistent Time")
+		logger.Log.Warnf("xtrabackup_timestamp_info file not found, "+
+			"use current time as Consistent Time, err: %s", err.Error())
 		metaInfo.BackupConsistentTime, _ = time.Parse(time.DateTime, p.backupEndTime.Format(time.DateTime))
 	}
 	// parse xtrabackup_binlog_info 本机的 binlog file,pos
@@ -280,7 +281,8 @@ func (p *PhysicalDumper) PrepareBackupMetaInfo(cnf *config.BackupConfig) (*dbare
 	// parse xtrabackup_slave_info 如果是 slave，获取它的 master file,pos
 	if mysqlRole := strings.ToLower(cnf.Public.MysqlRole); mysqlRole == cst.RoleSlave || mysqlRole == cst.RoleRepeater {
 		if slaveStatus, err := parseXtraSlaveInfo(qpressPath, xtrabackupSlaveInfoFileName, tmpFileName); err != nil {
-			return nil, err
+			logger.Log.Warnf("parse xtrabackup_slave_info with error for role=%s %s:%d , err: %s",
+				cnf.Public.MysqlRole, cnf.Public.MysqlHost, cnf.Public.MysqlPort, err.Error())
 		} else {
 			metaInfo.BinlogInfo.ShowSlaveStatus = slaveStatus
 			masterHost, masterPort, err := mysqlconn.ShowMysqlSlaveStatus(db)

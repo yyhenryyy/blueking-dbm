@@ -12,13 +12,15 @@
         text
         theme="primary"
         @click="handleShowSql">
-        {{ modelValue.length < 1 ? t('点击添加') : t('n 个 SQL 文件', { n: modelValue.length }) }}
+        <span v-if="modelValue.length < 1">{{ t('点击添加') }}</span>
+        <span v-else-if="modelValue.length === 1">{{ modelValue[0] }}</span>
+        <span v-else>{{ t('n 个 SQL 文件', { n: modelValue.length }) }}</span>
       </BkButton>
     </span>
   </RenderTextPlain>
   <SqlContent
     v-model="modelValue"
-    v-model:importMode="importMode"
+    v-model:import-mode="importMode"
     v-model:is-show="isShowSql"
     :cluster-version-list="clusterVersionList">
     <template #header>

@@ -114,7 +114,7 @@
   import { differenceInHours } from 'date-fns';
   import { useI18n } from 'vue-i18n';
 
-  import MysqlPermissonAccountModel from '@services/model/mysql-permisson/mysql-permission-account';
+  import MysqlPermissonAccountModel from '@services/model/mysql/mysql-permission-account';
   import {
     deleteAccount,
     getPermissionRules,
@@ -132,9 +132,10 @@
   } from '@common/const';
 
   import PermissionCatch from '@components/apply-permission/Catch.vue'
-  import ClusterAuthorize from '@components/cluster-authorize/ClusterAuthorize.vue';
   import DbTable from '@components/db-table/index.vue';
   import TextOverflowLayout from '@components/text-overflow-layout/Index.vue';
+
+  import ClusterAuthorize from '@views/db-manage/common/cluster-authorize/ClusterAuthorize.vue';
 
   import { getSearchSelectorParams } from '@utils';
 

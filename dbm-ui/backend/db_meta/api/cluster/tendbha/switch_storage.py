@@ -34,7 +34,7 @@ def switch_storage(cluster_id: int, target_storage_ip: str, origin_storage_ip: s
     )
     cluster.storageinstance_set.remove(origin_storage)
     target_storage.status = InstanceStatus.RUNNING.value
-    if role and target_storage == InstanceRole.BACKEND_REPEATER:
+    if role and target_storage.instance_role == InstanceRole.BACKEND_REPEATER.value:
         # 如果是REPEATER角色，改成传入的role变量
         target_storage.instance_role = role
         target_storage.instance_inner_role = InstanceRoleInstanceInnerRoleMap[role].value
@@ -63,6 +63,6 @@ def change_storage_cluster_entry(cluster_id: int, slave_ip: str, new_slave_ip: s
     cluster = Cluster.objects.get(id=cluster_id)
     slave_storage = cluster.storageinstance_set.get(machine__ip=slave_ip)
     new_slave_storage = cluster.storageinstance_set.get(machine__ip=new_slave_ip)
-    slave_bind_entry = slave_storage.bind_entry.get()
-    slave_bind_entry.storageinstance_set.remove(slave_storage)
-    slave_bind_entry.storageinstance_set.add(new_slave_storage)
+    for be in slave_storage.bind_entry.all():
+        be.storageinstance_set.remove(slave_storage)
+        be.storageinstance_set.add(new_slave_storage)

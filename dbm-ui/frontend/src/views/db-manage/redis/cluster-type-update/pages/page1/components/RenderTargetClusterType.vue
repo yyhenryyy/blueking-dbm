@@ -74,7 +74,7 @@
     },
     {
       value: ClusterTypes.PREDIXY_REDIS_CLUSTER,
-      label: t('RedisCluster集群'),
+      label: 'RedisCluster',
     },
   ];
 
@@ -94,7 +94,10 @@
 
   defineExpose<Exposes>({
     getValue() {
-      return selectRef.value.getValue().then(() => localValue.value);
+      return selectRef.value
+        .getValue()
+        .then(() => localValue.value)
+        .catch(() => Promise.reject(localValue.value));
     },
   });
 </script>

@@ -93,13 +93,10 @@
       </template>
     </BkDialog>
   </div>
-  <EditEntryConfig
-    :id="clusterId"
-    v-model:is-show="showEditEntryConfig"
-    :get-detail-info="getPulsarDetail" />
 </template>
 <script setup lang="tsx">
   import { InfoBox, Message } from 'bkui-vue';
+  import type { ISearchItem } from 'bkui-vue/lib/search-select/utils';
   import { useI18n } from 'vue-i18n';
   import {
     useRoute,
@@ -124,22 +121,22 @@
 
   import { useGlobalBizs } from '@stores';
 
-  import { ClusterTypes, UserPersonalSettings } from '@common/const';
+  import { ClusterTypes, DBTypes, UserPersonalSettings } from '@common/const';
 
-  import ClusterCapacityUsageRate from '@components/cluster-capacity-usage-rate/Index.vue'
-  import OperationBtnStatusTips from '@components/cluster-common/OperationBtnStatusTips.vue';
-  import RenderNodeInstance from '@components/cluster-common/RenderNodeInstance.vue';
-  import RenderOperationTag from '@components/cluster-common/RenderOperationTag.vue';
-  import RenderClusterStatus from '@components/cluster-common/RenderStatus.vue';
-  import EditEntryConfig from '@components/cluster-entry-config/Index.vue';
+  import RenderClusterStatus from '@components/cluster-status/Index.vue';
   import DbTable from '@components/db-table/index.vue';
-  import DropdownExportExcel from '@components/dropdown-export-excel/index.vue';
   import MoreActionExtend from '@components/more-action-extend/Index.vue';
   import TextOverflowLayout from '@components/text-overflow-layout/Index.vue';
 
+  import ClusterCapacityUsageRate from '@views/db-manage/common/cluster-capacity-usage-rate/Index.vue'
+  import EditEntryConfig from '@views/db-manage/common/cluster-entry-config/Index.vue';
   import ClusterIpCopy from '@views/db-manage/common/cluster-ip-copy/Index.vue';
+  import DropdownExportExcel from '@views/db-manage/common/dropdown-export-excel/index.vue';
+  import OperationBtnStatusTips from '@views/db-manage/common/OperationBtnStatusTips.vue';
   import RenderCellCopy from '@views/db-manage/common/render-cell-copy/Index.vue';
   import RenderHeadCopy from '@views/db-manage/common/render-head-copy/Index.vue';
+  import RenderNodeInstance from '@views/db-manage/common/RenderNodeInstance.vue';
+  import RenderOperationTag from '@views/db-manage/common/RenderOperationTag.vue';
   import ClusterExpansion from '@views/db-manage/pulsar/common/expansion/Index.vue';
   import ClusterShrink from '@views/db-manage/pulsar/common/shrink/Index.vue';
 
@@ -149,11 +146,6 @@
   } from '@utils';
 
   import ManagerPassword from './components/ManagerPassword.vue';
-
-  import type {
-    SearchSelectData,
-    SearchSelectItem,
-  } from '@/types/bkui-vue';
 
   const clusterId = defineModel<number>('clusterId');
 
@@ -218,7 +210,6 @@
   const isShowShrink = ref(false);
   const isShowPassword = ref(false);
   const isInit = ref(true);
-  const showEditEntryConfig = ref(false);
   const selected = ref<PulsarModel[]>([])
   const operationData = shallowRef<PulsarModel>();
 
@@ -308,17 +299,14 @@
                     ]
                   } />
                 )}
-                <auth-button
-                  v-bk-tooltips={t('修改入口配置')}
-                  v-db-console="pulsar.clusterManage.modifyEntryConfiguration"
-                  action-id="access_entry_edit"
-                  resource="pulsar"
-                  permission={data.permission.access_entry_edit}
-                  text
-                  theme="primary"
-                  onClick={() => handleOpenEntryConfig(data)}>
-                  <db-icon type="edit" />
-                </auth-button>
+                <span v-db-console="pulsar.clusterManage.modifyEntryConfiguration">
+                  <EditEntryConfig
+                    id={data.id}
+                    getDetailInfo={getPulsarDetail}
+                    permission={data.permission.access_entry_edit}
+                    resource={DBTypes.PULSAR}
+                    onSuccess={fetchTableData} />
+                </span>
               </>
             ),
           }}
@@ -572,6 +560,7 @@
                 text
                 theme="primary"
                 action-id="pulsar_enable_disable"
+                disabled={data.isStarting}
                 permission={data.permission.pulsar_enable_disable}
                 v-db-console="pulsar.clusterManage.enable"
                 resource={data.id}
@@ -736,7 +725,7 @@
       multiple: true,
       children: searchAttrs.value.time_zone,
     },
-  ] as SearchSelectData);
+  ]);
 
   // 设置用户个人表头信息
   const defaultSettings = {
@@ -755,6 +744,7 @@
       'pulsar_zookeeper',
       'pulsar_broker',
     ],
+    showLineHeight: false,
     trigger: 'manual' as const,
   };
 
@@ -763,7 +753,7 @@
     updateTableSettings,
   } = useTableSettings(UserPersonalSettings.PULSAR_TABLE_SETTINGS, defaultSettings);
 
-  const getMenuList = async (item: SearchSelectItem | undefined, keyword: string) => {
+  const getMenuList = async (item: ISearchItem | undefined, keyword: string) => {
     if (item?.id !== 'creator' && keyword) {
       return getMenuListSearch(item, keyword, serachData.value, searchValue.value);
     }
@@ -794,11 +784,6 @@
 
   const handleSelection = (data: PulsarModel, list: PulsarModel[]) => {
     selected.value = list;
-  };
-
-  const handleOpenEntryConfig = (row: PulsarModel) => {
-    showEditEntryConfig.value  = true;
-    clusterId.value = row.id;
   };
 
   const fetchTableData = (loading?:boolean) => {
@@ -1116,7 +1101,7 @@
         align-items: center;
       }
 
-      .db-icon-edit {
+      .db-icon-visible1 {
         display: none;
         margin-top: 2px;
         margin-left: 4px;
@@ -1126,7 +1111,7 @@
     }
 
     :deep(tr:hover) {
-      .db-icon-edit {
+      .db-icon-visible1 {
         display: inline-block !important;
       }
     }

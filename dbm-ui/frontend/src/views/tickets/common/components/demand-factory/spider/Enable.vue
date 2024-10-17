@@ -29,11 +29,12 @@
   import { useI18n } from 'vue-i18n';
   import { useRequest } from 'vue-request';
 
-  import { getSpiderListByBizId } from '@services/source/spider';
-  import type { SpiderEnableDetails, TicketDetails } from '@services/types/ticket';
+  import type { SpiderEnableDetails } from '@services/model/ticket/details/spider';
+  import TicketModel from '@services/model/ticket/ticket';
+  import { getTendbclusterListByBizId } from '@services/source/tendbcluster';
 
   interface Props {
-    ticketDetails: TicketDetails<SpiderEnableDetails>;
+    ticketDetails: TicketModel<SpiderEnableDetails>;
   }
 
   interface RowData {
@@ -55,7 +56,7 @@
     },
   ];
 
-  useRequest(getSpiderListByBizId, {
+  useRequest(getTendbclusterListByBizId, {
     defaultParams: [
       {
         bk_biz_id: props.ticketDetails.bk_biz_id,

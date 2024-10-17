@@ -64,6 +64,7 @@
   export interface IListItem {
     value: IKey;
     label: string;
+    [x: string]: any;
   }
 </script>
 <script setup lang="ts">
@@ -102,7 +103,7 @@
 
   const slots = defineSlots<
     Partial<{
-      default: () => VNode | VNode[];
+      default: (values: { optionItem: IListItem; index: number }) => VNode | VNode[];
       trigger: () => VNode | VNode[];
     }>
   >();

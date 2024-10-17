@@ -12,11 +12,13 @@
  */
 
 import DbResourceModel from '@services/model/db-resource/DbResource';
-import ImportHostModel from '@services/model/db-resource/import-host';
 import OperationModel from '@services/model/db-resource/Operation';
+import SummaryModel from '@services/model/db-resource/summary';
+import type { HostInfo, ListBase } from '@services/types';
+
+import type { DBTypes } from '@common/const';
 
 import http, { type IRequestPayload } from '../http';
-import type { HostDetails, ListBase } from '../types';
 
 const path = '/apis/dbresource/resource';
 
@@ -49,18 +51,11 @@ export function fetchMountPoints() {
 }
 
 /**
- * 根据逻辑城市查询园区
- */
-export function fetchSubzones(params: { citys: string }) {
-  return http.get<string[]>(`${path}/get_subzones/`, params);
-}
-
-/**
  * 资源池导入
  */
 export function importResource(params: {
-  for_bizs: number[];
-  resource_types: string[];
+  for_biz: number;
+  resource_type: string;
   hosts: Array<{
     ip: string;
     host_id: number;
@@ -94,7 +89,7 @@ export function fetchListDbaHost(params: { limit: number; offset: number; search
   return http
     .get<{
       total: number;
-      data: ImportHostModel[];
+      data: HostInfo[];
     }>(`${path}/list_dba_hosts/`, {
       search_content: params.search_content,
       start: params.offset,
@@ -110,7 +105,7 @@ export function fetchListDbaHost(params: { limit: number; offset: number; search
  * 查询DBA业务下的主机信息
  */
 export function fetchHostListByHostId(params: { bk_host_ids: string }) {
-  return http.get<HostDetails[]>(`${path}/query_dba_hosts/`, params);
+  return http.get<HostInfo[]>(`${path}/query_dba_hosts/`, params);
 }
 
 /**
@@ -170,11 +165,9 @@ export function getSpecResourceCount(params: {
  */
 export function updateResource(params: {
   bk_host_ids: number[];
-  for_bizs: number[];
+  for_biz: number;
   rack_id: string;
-  resource_types: string[];
-  set_empty_biz: boolean;
-  set_empty_resource_type: boolean;
+  resource_type: string;
   storage_device: Record<string, { size: number; disk_type: string }>;
 }) {
   return http.post(`${path}/update/`, params);
@@ -185,4 +178,32 @@ export function updateResource(params: {
  */
 export function getOsTypeList(params: { offset?: number; limit?: number }) {
   return http.get<string[]>(`${path}/get_os_types/`, params);
+}
+
+/**
+ * 按照组件统计资源数量
+ */
+export function getGroupCount() {
+  return http.post<{ rs_type: string; count: number }[]>(`${path}/resource_group_count/`);
+}
+
+/**
+ * 按照条件聚合资源统计
+ */
+export function getSummaryList(params: {
+  group_by: string;
+  for_biz?: number;
+  city?: string;
+  sub_zones?: string[];
+  spec_param: {
+    db_type: DBTypes;
+    machine_type?: string;
+    cluster_type?: string;
+    spec_id_list?: number[];
+  };
+}) {
+  return http.get<SummaryModel[]>(`${path}/resource_summary/`, params).then((data) => ({
+    count: data.length || 0,
+    results: data.map((item) => new SummaryModel(item)),
+  }));
 }

@@ -15,6 +15,7 @@
   <tr>
     <td style="padding: 0">
       <RenderTargetCluster
+        ref="clusterRef"
         :check-duplicate="false"
         :data="data.cluster"
         @on-input-finish="handleInputFinish" />
@@ -41,6 +42,7 @@
         :data="data"
         :instance-ip-list="instaceIpList"
         :is-loading="data.isLoading"
+        :selected-node-list="data.selectedNodeList"
         :tab-list-config="tabListConfig"
         @num-change="handleHostNumChange"
         @type-change="handleChangeHostSelectType" />
@@ -56,19 +58,21 @@
     </td>
     <OperateColumn
       :removeable="removeable"
+      show-clone
       @add="handleAppend"
+      @clone="handleClone"
       @remove="handleRemove" />
   </tr>
 </template>
 <script lang="ts">
   import { useI18n } from 'vue-i18n';
 
-  import SpiderModel from '@services/model/spider/spider';
-  import { getSpiderMachineList } from '@services/source/spider';
+  import TendbClusterModel from '@services/model/tendbcluster/tendbcluster';
+  import { getTendbclusterMachineList } from '@services/source/tendbcluster';
 
   import { ClusterTypes } from '@common/const';
 
-  import { type PanelListType } from '@components/instance-selector/Index.vue';
+  import type { IValue, PanelListType } from '@components/instance-selector/Index.vue';
   import OperateColumn from '@components/render-table/columns/operate-column/index.vue';
   import RenderRoleHostSelect, { HostSelectType } from '@components/render-table/columns/role-host-select/Index.vue';
 
@@ -90,10 +94,11 @@
     nodeType: string;
     masterCount: number;
     slaveCount: number;
-    spiderMasterList: SpiderModel['spider_master'];
-    spiderSlaveList: SpiderModel['spider_slave'];
+    spiderMasterList: TendbClusterModel['spider_master'];
+    spiderSlaveList: TendbClusterModel['spider_slave'];
     spec?: SpecInfo;
     hostSelectType?: string;
+    selectedNodeList?: IValue[];
     targetNum?: string;
   }
 
@@ -132,6 +137,7 @@
   interface Emits {
     (e: 'add', params: Array<IDataRow>): void;
     (e: 'remove'): void;
+    (e: 'clone', value: IDataRow): void;
     (e: 'clusterInputFinish', value: string): void;
     (e: 'nodeTypeChoosed', label: string): void;
   }
@@ -148,6 +154,7 @@
 
   const { t } = useI18n();
 
+  const clusterRef = ref<InstanceType<typeof RenderTargetCluster>>();
   const nodeTypeRef = ref<InstanceType<typeof RenderNodeType>>();
   const hostRef = ref<InstanceType<typeof RenderRoleHostSelect>>();
   const tergetNumRef = ref<InstanceType<typeof RenderTargetNumber>>();
@@ -168,15 +175,15 @@
           name: t('主机选择'),
           topoConfig: {
             filterClusterId: props.data!.clusterId,
-            countFunc: (clusterItem: SpiderModel) => {
+            countFunc: (clusterItem: TendbClusterModel) => {
               const hostList = isMater ? clusterItem.spider_master : clusterItem.spider_slave;
               const ipList = hostList.map((hostItem) => hostItem.ip);
               return new Set(ipList).size;
             },
           },
           tableConfig: {
-            getTableList: (params: ServiceReturnType<typeof getSpiderMachineList>) =>
-              getSpiderMachineList({
+            getTableList: (params: ServiceReturnType<typeof getTendbclusterMachineList>) =>
+              getTendbclusterMachineList({
                 ...params,
                 spider_role: isMater ? 'spider_master' : 'spider_slave',
               }),
@@ -189,8 +196,8 @@
         },
         {
           tableConfig: {
-            getTableList: (params: ServiceReturnType<typeof getSpiderMachineList>) =>
-              getSpiderMachineList({
+            getTableList: (params: ServiceReturnType<typeof getTendbclusterMachineList>) =>
+              getTendbclusterMachineList({
                 ...params,
                 spider_role: isMater ? 'spider_master' : 'spider_slave',
               }),
@@ -233,7 +240,7 @@
     }
     emits('nodeTypeChoosed', choosedLabel);
 
-    localTargerNum.value = '';
+    // localTargerNum.value = '';
     hostRef.value?.resetValue();
   };
 
@@ -260,8 +267,40 @@
     emits('remove');
   };
 
+  const handleClone = () => {
+    Promise.allSettled([
+      clusterRef.value!.getValue(),
+      nodeTypeRef.value!.getValue(),
+      hostRef.value!.getValue('spider_reduced_hosts'),
+      tergetNumRef.value!.getValue(),
+    ]).then((rowData) => {
+      const rowInfo = rowData.map((item) => (item.status === 'fulfilled' ? item.value : item.reason));
+      const cloneData = {
+        rowKey: random(),
+        isLoading: false,
+        cluster: '',
+        clusterId: 0,
+        bkCloudId: 0,
+        nodeType: rowInfo[1].reduce_spider_role,
+        masterCount: 0,
+        slaveCount: 0,
+        spiderMasterList: [],
+        spiderSlaveList: [],
+        targetNum: String(nodeCount.value - Number(rowInfo[3].spider_reduced_to_count)),
+      };
+      if (rowInfo[2]) {
+        Object.assign(cloneData, {
+          hostSelectType: HostSelectType.MANUAL,
+          selectedNodeList: rowInfo[2].spider_reduced_hosts,
+        });
+      }
+      emits('clone', cloneData);
+    });
+  };
+
   defineExpose<Exposes>({
     async getValue() {
+      await clusterRef.value!.getValue();
       return Promise.all([
         nodeTypeRef.value!.getValue(),
         hostRef.value!.getValue('spider_reduced_hosts'),

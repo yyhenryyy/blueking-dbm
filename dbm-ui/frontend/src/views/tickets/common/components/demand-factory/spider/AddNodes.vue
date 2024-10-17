@@ -24,12 +24,13 @@
   import { useRequest } from 'vue-request';
 
   import ResourceSpecModel from '@services/model/resource-spec/resourceSpec';
+  import type { SpiderAddNodesDeatils } from '@services/model/ticket/details/spider';
+  import TicketModel from '@services/model/ticket/ticket';
   import { getResourceSpecList } from '@services/source/dbresourceSpec';
-  import { getSpiderListByBizId } from '@services/source/spider';
-  import type { SpiderAddNodesDeatils, TicketDetails } from '@services/types/ticket';
+  import { getTendbclusterListByBizId } from '@services/source/tendbcluster';
 
   interface Props {
-    ticketDetails: TicketDetails<SpiderAddNodesDeatils>
+    ticketDetails: TicketModel<SpiderAddNodesDeatils>
   }
 
   interface RowData {
@@ -74,7 +75,7 @@
     },
   ];
 
-  const { loading } = useRequest(getSpiderListByBizId, {
+  const { loading } = useRequest(getTendbclusterListByBizId, {
     defaultParams: [{
       bk_biz_id: props.ticketDetails.bk_biz_id,
       offset: 0,

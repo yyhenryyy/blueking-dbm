@@ -22,6 +22,7 @@
         :show-ip-cloumn="showIpCloumn"
         :variable-list="variableList"
         @add="(payload: Array<IDataRow>) => handleAppend(index, payload)"
+        @clone="(payload: IDataRow) => handleClone(index, payload)"
         @cluster-input-finish="(value) => handleInputCluster(index, value)"
         @remove="handleRemove(index)" />
     </RenderTable>
@@ -52,8 +53,8 @@
   import { shallowRef } from 'vue';
   import { useI18n } from 'vue-i18n';
 
-  import SpiderModel from '@services/model/spider/spider';
-  import type { HostDetails } from '@services/types/ip';
+  import TendbClusterModel from '@services/model/tendbcluster/tendbcluster';
+  import type { HostInfo } from '@services/types';
 
   import { ClusterTypes, OSTypes } from '@common/const';
 
@@ -91,8 +92,8 @@
   const isShowBatchInput = ref(false);
   const tableData = ref<IDataRow[]>([createRowData()]);
 
-  const localHostList = shallowRef<HostDetails[]>([]);
-  const selectedClusters = shallowRef<{ [key: string]: Array<SpiderModel> }>({
+  const localHostList = shallowRef<HostInfo[]>([]);
+  const selectedClusters = shallowRef<{ [key: string]: Array<TendbClusterModel> }>({
     [ClusterTypes.TENDBCLUSTER]: [],
   });
 
@@ -101,7 +102,7 @@
   // 集群域名是否已存在表格的映射表
   const domainMemo: Record<string, boolean> = {};
 
-  const handleHostChange = (hostList: HostDetails[]) => {
+  const handleHostChange = (hostList: HostInfo[]) => {
     if (checkListEmpty(tableData.value)) {
       return;
     }
@@ -118,7 +119,7 @@
     const localIps = localHostList.value.map((item) => item.ip);
     const whiteIps = _.flatMap(whiteList.map((item) => item.ips));
     const finalIps = Array.from(new Set([...localIps, ...whiteIps]));
-    localHostList.value = finalIps.map((ip) => ({ ip }) as HostDetails);
+    localHostList.value = finalIps.map((ip) => ({ ip }) as HostInfo);
     tableData.value.forEach((item) => (item.authorizeIps = localHostList.value.map((info) => info.ip)));
   };
 
@@ -150,7 +151,7 @@
   };
 
   // 输入集群后查询集群信息并填充到table
-  const handleInputCluster = async (index: number, item: SpiderModel) => {
+  const handleInputCluster = async (index: number, item: TendbClusterModel) => {
     const row = createRowData({
       clusterData: {
         id: item.id,
@@ -166,7 +167,7 @@
   };
 
   // 批量选择
-  const handelClusterChange = (selected: { [key: string]: Array<SpiderModel> }) => {
+  const handelClusterChange = (selected: { [key: string]: Array<TendbClusterModel> }) => {
     selectedClusters.value = selected;
     const list = selected[ClusterTypes.TENDBCLUSTER];
     const newList = list.reduce((result, item) => {
@@ -206,6 +207,16 @@
     const dataList = [...tableData.value];
     dataList.splice(index, 1);
     tableData.value = dataList;
+  };
+
+  // 复制行数据
+  const handleClone = (index: number, sourceData: IDataRow) => {
+    const dataList = [...tableData.value];
+    dataList.splice(index + 1, 0, sourceData);
+    tableData.value = dataList;
+    setTimeout(() => {
+      rowRefs.value[rowRefs.value.length - 1].getValue();
+    });
   };
 
   defineExpose<Exposes>({

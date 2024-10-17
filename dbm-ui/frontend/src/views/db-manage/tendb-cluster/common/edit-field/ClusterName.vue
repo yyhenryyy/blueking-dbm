@@ -128,9 +128,10 @@
     localClusterId,
     () => {
       if (!localClusterId.value) {
+        clusterIdMemo[instanceKey] = {};
         return;
       }
-      clusterIdMemo[instanceKey][localClusterId.value] = true;
+      clusterIdMemo[instanceKey] = { [localClusterId.value]: true };
     },
     {
       immediate: true,
@@ -143,9 +144,16 @@
     emits('onInputFinish', realValue);
   };
 
+  onUnmounted(() => {
+    delete clusterIdMemo[instanceKey];
+  });
+
   defineExpose<Exposes>({
     getValue() {
-      return editRef.value.getValue().then(() => localValue.value);
+      return editRef.value
+        .getValue()
+        .then(() => localValue.value)
+        .catch(() => Promise.reject(localValue));
     },
   });
 </script>

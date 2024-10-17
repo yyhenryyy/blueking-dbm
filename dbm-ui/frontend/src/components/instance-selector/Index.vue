@@ -95,7 +95,7 @@
 <script lang="ts">
   import type { InjectionKey, Ref } from 'vue';
 
-  import SpiderMachineModel from '@services/model/spider/spiderMachine';
+  import TendbclusterMachineModel from '@services/model/tendbcluster/tendbcluster-machine';
   import type { ListBase } from '@services/types';
 
   import { t } from '@locales/index';
@@ -121,7 +121,7 @@
       instance: string;
       status: string;
     }[];
-    spec_config?: SpiderMachineModel['spec_config'];
+    spec_config?: TendbclusterMachineModel['spec_config'];
     role: string;
   }
 
@@ -187,12 +187,8 @@
   import MongodbModel from '@services/model/mongodb/mongodb';
   import { checkMongoInstances, checkMysqlInstances, checkRedisInstances } from '@services/source/instances';
   import { getMongoInstancesList, getMongoTopoList } from '@services/source/mongodb';
-  import {
-    queryClusters as getMysqlClusterList,
-    queryClusters as queryMysqlCluster,
-  } from '@services/source/mysqlCluster';
+  import { queryClusters as queryMysqlCluster } from '@services/source/mysqlCluster';
   import { getRedisClusterList, getRedisMachineList } from '@services/source/redis';
-  import { getSpiderInstanceList, getSpiderMachineList } from '@services/source/spider';
   import {
     getHaClusterWholeList as getSqlServerHaCluster,
     getSqlServerInstanceList,
@@ -201,8 +197,16 @@
     getSingleClusterList,
     getSqlServerInstanceList as getSqlServerSingleInstanceList,
   } from '@services/source/sqlserverSingleCluster';
-  import { getTendbhaInstanceList } from '@services/source/tendbha';
-  import { getTendbsingleInstanceList } from '@services/source/tendbsingle';
+  import {
+    getTendbClusterFlatList as getTendbClusterList,
+    getTendbclusterInstanceList,
+    getTendbclusterMachineList,
+  } from '@services/source/tendbcluster';
+  import { getTendbhaFlatList as getTendbhaList, getTendbhaInstanceList } from '@services/source/tendbha';
+  import {
+    getTendbsingleFlatList as getTendbsingleList,
+    getTendbsingleInstanceList,
+  } from '@services/source/tendbsingle';
 
   import { ClusterTypes } from '@common/const';
 
@@ -363,10 +367,10 @@
         id: 'tendbcluster',
         name: 'Tendb Cluster',
         topoConfig: {
-          getTopoList: getMysqlClusterList,
+          getTopoList: getTendbClusterList,
         },
         tableConfig: {
-          getTableList: getSpiderInstanceList,
+          getTableList: getTendbclusterInstanceList,
           firsrColumn: {
             label: 'remote_master',
             field: 'instance_address',
@@ -379,7 +383,7 @@
         id: 'manualInput',
         name: t('手动输入'),
         tableConfig: {
-          getTableList: getSpiderInstanceList,
+          getTableList: getTendbclusterInstanceList,
           firsrColumn: {
             label: 'remote_master',
             field: 'instance_address',
@@ -400,7 +404,7 @@
         id: 'tendbsingle',
         name: t('Mysql 单节点'),
         topoConfig: {
-          getTopoList: getMysqlClusterList,
+          getTopoList: getTendbsingleList,
         },
         tableConfig: {
           getTableList: getTendbsingleInstanceList,
@@ -437,7 +441,7 @@
         id: 'tendbha',
         name: t('Mysql 主从'),
         topoConfig: {
-          getTopoList: getMysqlClusterList,
+          getTopoList: getTendbhaList,
         },
         tableConfig: {
           getTableList: getTendbhaInstanceList,
@@ -493,7 +497,7 @@
         id: 'manualInput',
         name: t('手动输入'),
         tableConfig: {
-          getTableList: getSpiderInstanceList,
+          getTableList: getTendbclusterInstanceList,
           firsrColumn: {
             label: 'IP',
             field: 'ip',
@@ -523,7 +527,7 @@
           },
         },
         tableConfig: {
-          getTableList: getSpiderMachineList,
+          getTableList: getTendbclusterMachineList,
           firsrColumn: {
             label: t('主库主机'),
             field: 'ip',
@@ -540,7 +544,7 @@
         id: 'manualInput',
         name: t('手动输入'),
         tableConfig: {
-          getTableList: getSpiderMachineList,
+          getTableList: getTendbclusterMachineList,
           firsrColumn: {
             label: 'remote_master',
             field: 'ip',
@@ -549,7 +553,7 @@
           columnsChecked: ['ip', 'related_instances', 'cloud_area', 'alive', 'host_name', 'os_name'],
         },
         manualConfig: {
-          checkInstances: getSpiderMachineList,
+          checkInstances: getTendbclusterMachineList,
           checkType: 'ip',
           checkKey: 'ip',
           activePanelId: 'TendbClusterHost',

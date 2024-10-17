@@ -73,10 +73,6 @@
     v-model:is-show="isShowExcelAuthorize"
     :cluster-type="ClusterTypes.SQLSERVER_HA"
     :ticket-type="TicketTypes.SQLSERVER_EXCEL_AUTHORIZE_RULES" />
-  <EditEntryConfig
-    :id="showEnterConfigClusterId"
-    v-model:is-show="showEditEntryConfig"
-    :get-detail-info="getHaClusterDetail" />
   <ClusterReset
     v-if="currentData"
     v-model:is-show="isShowClusterReset"
@@ -84,6 +80,7 @@
 </template>
 <script setup lang="tsx">
   import { InfoBox, Message } from 'bkui-vue';
+  import type { ISearchItem } from 'bkui-vue/lib/search-select/utils';
   import { useI18n } from 'vue-i18n';
   import { useRequest } from 'vue-request';
   import {
@@ -91,7 +88,7 @@
     useRouter,
   } from 'vue-router';
 
-  import SqlServerHaClusterModel from '@services/model/sqlserver/sqlserver-ha-cluster';
+  import SqlServerHaModel from '@services/model/sqlserver/sqlserver-ha';
   import {
     getHaClusterDetail,
     getHaClusterList,
@@ -113,26 +110,27 @@
   import {
     AccountTypes,
     ClusterTypes,
+    DBTypes,
     TicketTypes,
     type TicketTypesStrings,
     UserPersonalSettings,
   } from '@common/const';
 
-  import ClusterAuthorize from '@components/cluster-authorize/ClusterAuthorize.vue';
-  import ClusterCapacityUsageRate from '@components/cluster-capacity-usage-rate/Index.vue'
-  import ExcelAuthorize from '@components/cluster-common/ExcelAuthorize.vue';
-  import OperationBtnStatusTips from '@components/cluster-common/OperationBtnStatusTips.vue';
-  import RenderOperationTag from '@components/cluster-common/RenderOperationTag.vue';
-  import RenderClusterStatus from '@components/cluster-common/RenderStatus.vue';
-  import EditEntryConfig from '@components/cluster-entry-config/Index.vue';
+  import RenderClusterStatus from '@components/cluster-status/Index.vue';
   import DbTable from '@components/db-table/index.vue';
-  import DropdownExportExcel from '@components/dropdown-export-excel/index.vue';
-  import RenderInstances from '@components/render-instances/RenderInstances.vue';
   import TextOverflowLayout from '@components/text-overflow-layout/Index.vue';
 
+  import ClusterAuthorize from '@views/db-manage/common/cluster-authorize/ClusterAuthorize.vue';
+  import ClusterCapacityUsageRate from '@views/db-manage/common/cluster-capacity-usage-rate/Index.vue'
+  import EditEntryConfig, { type RowData } from '@views/db-manage/common/cluster-entry-config/Index.vue';
   import ClusterIpCopy from '@views/db-manage/common/cluster-ip-copy/Index.vue';
+  import DropdownExportExcel from '@views/db-manage/common/dropdown-export-excel/index.vue';
+  import ExcelAuthorize from '@views/db-manage/common/ExcelAuthorize.vue';
+  import OperationBtnStatusTips from '@views/db-manage/common/OperationBtnStatusTips.vue';
   import RenderCellCopy from '@views/db-manage/common/render-cell-copy/Index.vue';
   import RenderHeadCopy from '@views/db-manage/common/render-head-copy/Index.vue';
+  import RenderInstances from '@views/db-manage/common/render-instances/RenderInstances.vue';
+  import RenderOperationTag from '@views/db-manage/common/RenderOperationTag.vue';
   import ClusterReset from '@views/db-manage/sqlserver/components/cluster-reset/Index.vue'
 
   import {
@@ -140,11 +138,6 @@
     getSearchSelectorParams,
     isRecentDays
   } from '@utils';
-
-  import type {
-    SearchSelectData,
-    SearchSelectItem,
-  } from '@/types/bkui-vue';
 
   const haClusterData = defineModel<{
     clusterId: number,
@@ -199,10 +192,8 @@
   const tableRef = ref<InstanceType<typeof DbTable>>();
   const isShowExcelAuthorize = ref(false);
   const isShowClusterReset = ref(false)
-  const showEditEntryConfig = ref(false);
-  const showEnterConfigClusterId = ref(0);
-  const currentData = ref<SqlServerHaClusterModel>()
-  const selected = ref<SqlServerHaClusterModel[]>([])
+  const currentData = ref<SqlServerHaModel>()
+  const selected = ref<SqlServerHaModel[]>([])
 
   /** 集群授权 */
   const authorizeShow = ref(false);
@@ -286,7 +277,7 @@
       multiple: true,
       children: searchAttrs.value.time_zone,
     },
-  ] as SearchSelectData);
+  ]);
 
 
   const tableOperationWidth = computed(() => {
@@ -302,6 +293,23 @@
       ticketMessage(res.id);
     },
   });
+
+  const renderEntry = (data: RowData) => {
+    if (data.role === 'master_entry') {
+      return (
+        <span>
+          <bk-tag size="small" theme="success">{ t('主') }</bk-tag>{ data.entry }
+        </span>
+      )
+    }
+    return (
+      <span>
+        <bk-tag size="small" theme="info">{ t('从') }</bk-tag>{ data.entry }
+      </span>
+    )
+  }
+
+  const entrySort = (data: RowData[]) => data.sort(a => a.role === 'master_entry' ? -1 : 1);
 
   const columns = computed(() => [
     {
@@ -338,16 +346,19 @@
           {t('主访问入口')}
         </RenderHeadCopy>
       ),
-      render: ({ data }: { data: SqlServerHaClusterModel }) => (
+      render: ({ data }: { data: SqlServerHaModel }) => (
         <TextOverflowLayout>
           {{
             default: () => (
-              <bk-button
+              <auth-button
+                action-id="sqlserver_view"
+                permission={data.permission.sqlserver_view}
+                resource-id={data.id}
                 text
                 theme="primary"
                 onClick={() => handleToDetails(data)}>
                 {data.masterDomainDisplayName}
-              </bk-button>
+              </auth-button>
             ),
             append: () => (
               <>
@@ -377,14 +388,16 @@
                       data-text="NEW"/>
                   )
                 }
-                <bk-button
-                  v-bk-tooltips={t('修改入口配置')}
-                  class="ml-4"
-                  text
-                  theme="primary"
-                  onClick={() => handleOpenEntryConfig(data)}>
-                  <db-icon type="edit" />
-                </bk-button>
+                <span v-db-console="sqlserver.haClusterList.modifyEntryConfiguration">
+                  <EditEntryConfig
+                    id={data.id}
+                    getDetailInfo={getHaClusterDetail}
+                    permission={data.permission.access_entry_edit}
+                    resource={DBTypes.SQLSERVER}
+                    renderEntry={renderEntry}
+                    sort={entrySort}
+                    onSuccess={fetchData} />
+                </span>
               </>
             ),
           }}
@@ -412,7 +425,7 @@
           {t('集群名称')}
         </RenderHeadCopy>
       ),
-      render: ({ data }: { data: SqlServerHaClusterModel }) => (
+      render: ({ data }: { data: SqlServerHaModel }) => (
         <TextOverflowLayout>
           {{
             default: () => data.cluster_name,
@@ -455,7 +468,7 @@
         checked: columnCheckedMap.value.bk_cloud_id,
       },
       width: 90,
-      render: ({ data }: { data: SqlServerHaClusterModel }) => <span>{data.bk_cloud_name || '--'}</span>,
+      render: ({ data }: { data: SqlServerHaModel }) => <span>{data.bk_cloud_name || '--'}</span>,
     },
     {
       label: t('状态'),
@@ -474,14 +487,14 @@
         ],
         checked: columnCheckedMap.value.status,
       },
-      render: ({ data }: { data: SqlServerHaClusterModel }) => <RenderClusterStatus data={data.status} />,
+      render: ({ data }: { data: SqlServerHaModel }) => <RenderClusterStatus data={data.status} />,
     },
     {
       label: t('容量使用率'),
       field: 'cluster_stats',
       width: 240,
       showOverflowTooltip: false,
-      render: ({ data }: { data: SqlServerHaClusterModel }) => <ClusterCapacityUsageRate clusterStats={data.cluster_stats} />
+      render: ({ data }: { data: SqlServerHaModel }) => <ClusterCapacityUsageRate clusterStats={data.cluster_stats} />
     },
     {
       label: t('从访问入口'),
@@ -510,7 +523,7 @@
           {t('从访问入口')}
         </RenderHeadCopy>
       ),
-      render: ({ data }: { data: SqlServerHaClusterModel }) => (
+      render: ({ data }: { data: SqlServerHaModel }) => (
         <TextOverflowLayout>
           {{
             default: () => data.slaveDomainDisplayName || '--',
@@ -528,14 +541,16 @@
                     }
                   ]
                 } />
-                <bk-button
-                  v-bk-tooltips={t('修改入口配置')}
-                  class="ml-4"
-                  text
-                  theme="primary"
-                  onClick={() => handleOpenEntryConfig(data)}>
-                  <db-icon type="edit" />
-                </bk-button>
+                <span v-db-console="sqlserver.haClusterList.modifyEntryConfiguration">
+                  <EditEntryConfig
+                    id={data.id}
+                    getDetailInfo={getHaClusterDetail}
+                    permission={data.permission.access_entry_edit}
+                    resource={DBTypes.SQLSERVER}
+                    renderEntry={renderEntry}
+                    sort={entrySort}
+                    onSuccess={fetchData} />
+                </span>
               </>
             )
           }}
@@ -569,7 +584,7 @@
           {'Master'}
         </RenderHeadCopy>
       ),
-      render: ({ data }: { data: SqlServerHaClusterModel }) => (
+      render: ({ data }: { data: SqlServerHaModel }) => (
         <RenderInstances
           highlightIps={batchSearchIpInatanceList.value}
           data={data.masters}
@@ -606,7 +621,7 @@
           {'Slave'}
         </RenderHeadCopy>
       ),
-      render: ({ data }: { data: SqlServerHaClusterModel }) => (
+      render: ({ data }: { data: SqlServerHaModel }) => (
         <RenderInstances
           highlightIps={batchSearchIpInatanceList.value}
           data={data.slaves}
@@ -624,7 +639,7 @@
         list: columnAttrs.value.db_module_id,
         checked: columnCheckedMap.value.db_module_id,
       },
-      render: ({ data }: { data: SqlServerHaClusterModel }) => <span>{data.db_module_name || '--'}</span>,
+      render: ({ data }: { data: SqlServerHaModel }) => <span>{data.db_module_name || '--'}</span>,
     },
     {
       label: t('版本'),
@@ -635,14 +650,14 @@
         list: columnAttrs.value.major_version,
         checked: columnCheckedMap.value.major_version,
       },
-      render: ({ data }: { data: SqlServerHaClusterModel }) => <span>{data.major_version || '--'}</span>,
+      render: ({ data }: { data: SqlServerHaModel }) => <span>{data.major_version || '--'}</span>,
     },
     {
       label: t('同步模式'),
       field: 'sync_mode',
       minWidth: 120,
       width: 120,
-      render: ({ data }: { data: SqlServerHaClusterModel }) => <span>{data.sync_mode || '--'}</span>,
+      render: ({ data }: { data: SqlServerHaModel }) => <span>{data.sync_mode || '--'}</span>,
     },
     {
       label: t('地域'),
@@ -652,20 +667,20 @@
         list: columnAttrs.value.region,
         checked: columnCheckedMap.value.region,
       },
-      render: ({ data }: { data: SqlServerHaClusterModel }) => <span>{data.region || '--'}</span>,
+      render: ({ data }: { data: SqlServerHaModel }) => <span>{data.region || '--'}</span>,
     },
     {
       label: t('创建人'),
       field: 'creator',
       width: 140,
-      render: ({ data }: { data: SqlServerHaClusterModel }) => <span>{data.creator || '--'}</span>,
+      render: ({ data }: { data: SqlServerHaModel }) => <span>{data.creator || '--'}</span>,
     },
     {
       label: t('部署时间'),
       field: 'create_at',
       width: 200,
       sort: true,
-      render: ({ data }: { data: SqlServerHaClusterModel }) => <span>{data.createAtDisplay || '--'}</span>,
+      render: ({ data }: { data: SqlServerHaModel }) => <span>{data.createAtDisplay || '--'}</span>,
     },
     {
       label: t('时区'),
@@ -675,14 +690,14 @@
         list: columnAttrs.value.time_zone,
         checked: columnCheckedMap.value.time_zone,
       },
-      render: ({ data }: { data: SqlServerHaClusterModel }) => <span>{data.cluster_time_zone || '--'}</span>,
+      render: ({ data }: { data: SqlServerHaModel }) => <span>{data.cluster_time_zone || '--'}</span>,
     },
     {
       label: t('操作'),
       field: '',
       width: tableOperationWidth.value,
       fixed: isStretchLayoutOpen.value ? false : 'right',
-      render: ({ data }: { data: SqlServerHaClusterModel }) => (
+      render: ({ data }: { data: SqlServerHaModel }) => (
         <>
           {
             data.isOnline ? (
@@ -772,7 +787,7 @@
     updateTableSettings,
   } = useTableSettings(UserPersonalSettings.SQLSERVER_HA_TABLE_SETTINGS, defaultSettings);
 
-  const getMenuList = async (item: SearchSelectItem | undefined, keyword: string) => {
+  const getMenuList = async (item: ISearchItem | undefined, keyword: string) => {
     if (item?.id !== 'creator' && keyword) {
       return getMenuListSearch(item, keyword, searchSelectData.value, searchValue.value);
     }
@@ -824,18 +839,14 @@
     }, [] as string[]);
     copy(copyList.join('\n'));
   }
-  const handleOpenEntryConfig = (row: SqlServerHaClusterModel) => {
-    showEditEntryConfig.value  = true;
-    showEnterConfigClusterId.value = row.id;
-  };
 
   // 获取列表数据下的实例子列表
-  const getInstanceListByRole = (dataList: SqlServerHaClusterModel[], field: keyof SqlServerHaClusterModel) => dataList.reduce((result, curRow) => {
-    result.push(...curRow[field] as SqlServerHaClusterModel['masters']);
+  const getInstanceListByRole = (dataList: SqlServerHaModel[], field: keyof SqlServerHaModel) => dataList.reduce((result, curRow) => {
+    result.push(...curRow[field] as SqlServerHaModel['masters']);
     return result;
-  }, [] as SqlServerHaClusterModel['masters']);
+  }, [] as SqlServerHaModel['masters']);
 
-  const handleCopySelected = <T,>(field: keyof T, role?: keyof SqlServerHaClusterModel) => {
+  const handleCopySelected = <T,>(field: keyof T, role?: keyof SqlServerHaModel) => {
     if(role) {
       handleCopy(getInstanceListByRole(selected.value, role) as T[], field)
       return;
@@ -843,8 +854,8 @@
     handleCopy(selected.value as T[], field)
   }
 
-  const handleCopyAll = async <T,>(field: keyof T, role?: keyof SqlServerHaClusterModel) => {
-    const allData = await tableRef.value!.getAllData<SqlServerHaClusterModel>();
+  const handleCopyAll = async <T,>(field: keyof T, role?: keyof SqlServerHaModel) => {
+    const allData = await tableRef.value!.getAllData<SqlServerHaModel>();
     if(allData.length === 0) {
       Message({
         theme: 'primary',
@@ -864,7 +875,7 @@
    */
   const handleSwitchCluster = (
     type: TicketTypesStrings,
-    data: SqlServerHaClusterModel,
+    data: SqlServerHaModel,
   ) => {
     if (!type) return;
 
@@ -899,7 +910,7 @@
   /**
    * 删除集群
    */
-  const handleDeleteCluster = (data: SqlServerHaClusterModel) => {
+  const handleDeleteCluster = (data: SqlServerHaModel) => {
     const { cluster_name: name } = data;
     InfoBox({
       type: 'warning',
@@ -927,7 +938,7 @@
     });
   };
 
-  const handleResetCluster = (data: SqlServerHaClusterModel) => {
+  const handleResetCluster = (data: SqlServerHaModel) => {
     currentData.value = data
     isShowClusterReset.value = true
   }
@@ -938,7 +949,7 @@
   };
 
   // 设置行样式
-  const setRowClass = (row: SqlServerHaClusterModel) => {
+  const setRowClass = (row: SqlServerHaModel) => {
     const classStack = [];
     if (row.isNew) {
       classStack.push('is-new-row');
@@ -953,7 +964,7 @@
    * 查看详情
    */
   const handleToDetails = (
-    data: SqlServerHaClusterModel,
+    data: SqlServerHaModel,
     isAllSpread = false,
   ) => {
     stretchLayoutSplitScreen();
@@ -965,8 +976,8 @@
     }
   };
 
-  const handleSelection = (key: number[], list: Record<number, SqlServerHaClusterModel>[]) => {
-    selected.value = list as unknown as SqlServerHaClusterModel[];
+  const handleSelection = (key: number[], list: Record<number, SqlServerHaModel>[]) => {
+    selected.value = list as unknown as SqlServerHaModel[];
   };
 
   const handleClearSelected = () => {
@@ -1022,7 +1033,7 @@
 
       .db-icon-copy,
       .db-icon-link,
-      .db-icon-edit {
+      .db-icon-visible1 {
         display: none;
         margin-left: 4px;
         color: @primary-color;
@@ -1049,7 +1060,7 @@
     td:hover {
       .db-icon-copy,
       .db-icon-link,
-      .db-icon-edit {
+      .db-icon-visible1 {
         display: inline-block !important;
       }
     }

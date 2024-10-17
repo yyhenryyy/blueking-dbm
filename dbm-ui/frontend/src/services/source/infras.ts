@@ -30,16 +30,17 @@ export function getInfrasCities() {
 }
 
 /**
- * 主机提交格式
+ * 查询城市园区信息
  */
-interface HostSubmitParams {
-  ip: string;
-  bk_cloud_id: number;
-  bk_host_id: number;
-  bk_cpu?: number;
-  bk_mem?: number;
-  bk_disk?: number;
-  bk_biz_id: number;
+export function getInfrasSubzonesByCity(params: { city_code: string }) {
+  return http.get<
+    {
+      bk_city: number;
+      bk_city_code: string;
+      bk_sub_zone_id: number;
+      bk_sub_zone: string;
+    }[]
+  >(`${path}/cities/list_subzones/`, params);
 }
 
 /**
@@ -47,8 +48,24 @@ interface HostSubmitParams {
  */
 export function getCapSpecs(params: {
   nodes: {
-    master: Array<HostSubmitParams>;
-    slave: Array<HostSubmitParams>;
+    master: Array<{
+      ip: string;
+      bk_cloud_id: number;
+      bk_host_id: number;
+      bk_cpu?: number;
+      bk_mem?: number;
+      bk_disk?: number;
+      bk_biz_id: number;
+    }>;
+    slave: Array<{
+      ip: string;
+      bk_cloud_id: number;
+      bk_host_id: number;
+      bk_cpu?: number;
+      bk_mem?: number;
+      bk_disk?: number;
+      bk_biz_id: number;
+    }>;
   };
   ip_source: string;
   cluster_type: string;

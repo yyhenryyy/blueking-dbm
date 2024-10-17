@@ -2,6 +2,9 @@ package restore
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
@@ -49,7 +52,7 @@ func (m *DBLoader) Init() error {
 		}
 	}
 
-	if err = m.initDirs(); err != nil {
+	if err = m.initDirs(true); err != nil {
 		return err
 	}
 	return nil
@@ -65,8 +68,18 @@ func (m *DBLoader) PreCheck() error {
 		return err
 	}
 	// validateBackupInfo before run import
-	if _, err := m.getChangeMasterPos(m.SrcInstance); err != nil {
-		return err
+	// 重建模式，不需要 restore_opt 选项，但要校验位点信息
+	// 回档模式，如果是备份记录回档则不需要位点，如果是需要基于 binlog 回档，则要检验位点信息
+	if m.RestoreParam.RestoreOpt == nil {
+		m.RestoreParam.RestoreOpt = &RestoreOpt{
+			EnableBinlog:      false,
+			WillRecoverBinlog: true,
+		}
+	}
+	if m.RestoreParam.RestoreOpt.WillRecoverBinlog {
+		if _, err := m.getChangeMasterPos(m.SrcInstance); err != nil {
+			return err
+		}
 	}
 	// 工具可执行权限
 	// 本地实例是否可联通
@@ -141,7 +154,7 @@ func (m *DBLoader) Start() error {
 		cmutil.ExecCommand(false, "", "chown", "-R", "mysql.mysql", m.taskDir)
 	}()
 	logger.Info("开始解压 taskDir=%s", m.taskDir)
-	if err := m.BackupInfo.indexObj.UntarFiles(m.taskDir); err != nil {
+	if err := m.BackupInfo.indexObj.UntarFiles(m.taskDir, false); err != nil {
 		return err
 	}
 	logger.Info("开始数据恢复 targetDir=%s", m.targetDir)
@@ -163,26 +176,41 @@ func (m *DBLoader) PostCheck() error {
 
 // ReturnChangeMaster TODO
 func (m *DBLoader) ReturnChangeMaster() (*mysqlutil.ChangeMaster, error) {
-	return m.getChangeMasterPos(m.SrcInstance)
+	if m.RestoreParam.RestoreOpt != nil && m.RestoreParam.RestoreOpt.WillRecoverBinlog { //
+		return m.getChangeMasterPos(m.SrcInstance)
+	} else {
+		return &mysqlutil.ChangeMaster{}, nil
+	}
 }
 
-func (m *DBLoader) initDirs() error {
+// initDirs 如果 removeOld =  true，会删除当前任务目录下，之前的解压目录，可能是重试导致的废弃目录
+func (m *DBLoader) initDirs(removeOld bool) error {
 	if m.BackupInfo.WorkDir == "" {
 		return errors.Errorf("work_dir %s should not be empty", m.WorkDir)
 	}
 	if m.WorkID == "" {
 		m.WorkID = newTimestampString()
 	}
+	if removeOld { // 删除旧目录
+		timeNow := time.Now()
+		oldDirs, _ := filepath.Glob(fmt.Sprintf("%s/doDr_*", m.WorkDir))
+		for _, oldDir := range oldDirs {
+			if dirInfo, err := os.Stat(oldDir); err == nil && dirInfo.IsDir() {
+				if timeNow.Sub(dirInfo.ModTime()) > 1*time.Minute {
+					logger.Warn("remove old recover work directory: ", oldDirs)
+					_ = os.RemoveAll(oldDir)
+				}
+			}
+		}
+	}
+
 	m.taskDir = fmt.Sprintf("%s/doDr_%s/%d", m.WorkDir, m.WorkID, m.TgtInstance.Port)
 	if err := osutil.CheckAndMkdir("", m.taskDir); err != nil {
 		return err
 	}
-	/*
-		if m.BackupInfo.indexObj.GetMetafileBasename() == "" {
-			return errors.New("backup file baseName error")
-		}
-	*/
 	m.targetDir = m.BackupInfo.indexObj.GetTargetDir(m.taskDir)
+	logger.Info("current recover work directory: %s", m.taskDir)
+	logger.Info("current recover work target directory: %s", m.targetDir)
 	return nil
 }
 

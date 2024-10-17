@@ -39,7 +39,7 @@
       <DbTable
         ref="tableRef"
         :columns="columns"
-        :data-source="getSpiderInstanceList"
+        :data-source="getTendbclusterInstanceList"
         :pagination-extra="paginationExtra"
         :row-class="setRowClass"
         selectable
@@ -55,8 +55,8 @@
 <script setup lang="tsx">
   import { useI18n } from 'vue-i18n';
 
-  import type TendbInstanceModel from '@services/model/spider/tendbInstance';
-  import { getSpiderInstanceList } from '@services/source/spider';
+  import type TendbInstanceModel from '@services/model/tendbcluster/tendbcluster-instance';
+  import { getTendbclusterInstanceList } from '@services/source/tendbcluster';
 
   import {
     useCopy,
@@ -75,8 +75,9 @@
   } from '@common/const';
 
   import DbStatus from '@components/db-status/index.vue';
-  import DropdownExportExcel from '@components/dropdown-export-excel/index.vue';
   import TextOverflowLayout from '@components/text-overflow-layout/Index.vue';
+
+  import DropdownExportExcel from '@views/db-manage/common/dropdown-export-excel/index.vue';
 
   import {
     getSearchSelectorParams,
@@ -142,7 +143,7 @@
         label: t('实例'),
         field: 'instance',
         fixed: 'left',
-        minWidth: 200,
+        width: 200,
         showOverflowTooltip: false,
         render: ({ data }: IColumn) => (
           <TextOverflowLayout>
@@ -164,9 +165,59 @@
         )
       },
       {
+        label: t('状态'),
+        field: 'status',
+        width: 140,
+        filter: {
+          list: [
+            {
+              value: 'normal',
+              text: t('正常'),
+            },
+            {
+              value: 'abnormal',
+              text: t('异常'),
+            },
+          ],
+          checked: columnCheckedMap.value.status,
+        },
+        render: ({ cell }: { cell: ClusterInstStatus }) => {
+          const info = clusterInstStatus[cell] || clusterInstStatus.unavailable;
+          return <DbStatus theme={info.theme}>{info.text}</DbStatus>;
+        },
+      },
+      {
+        label: t('部署角色'),
+        field: 'role',
+        width: 140,
+        filter: {
+          list: columnAttrs.value.role,
+          checked: columnCheckedMap.value.role,
+        },
+      },
+      {
+        label: t('所属集群'),
+        field: 'master_domain',
+        width: 260,
+        showOverflowTooltip: false,
+        render: ({ data }: {data: TendbInstanceModel}) => (
+          <TextOverflowLayout>
+            {{
+              default: () => data.master_domain || '--',
+              append: () => data.master_domain && (
+                <db-icon
+                  v-bk-tooltips={t('复制所属集群')}
+                  type="copy"
+                  onClick={() => copy(data.master_domain)} />
+              )
+            }}
+          </TextOverflowLayout>
+        )
+      },
+      {
         label: t('集群名称'),
         field: 'cluster_name',
-        minWidth: 200,
+        width: 180,
         showOverflowTooltip: false,
         render: ({ data }: {data: TendbInstanceModel}) => (
           <TextOverflowLayout>
@@ -195,74 +246,6 @@
         ),
       },
       {
-        label: t('状态'),
-        field: 'status',
-        width: 140,
-        filter: {
-          list: [
-            {
-              value: 'normal',
-              text: t('正常'),
-            },
-            {
-              value: 'abnormal',
-              text: t('异常'),
-            },
-          ],
-          checked: columnCheckedMap.value.status,
-        },
-        render: ({ cell }: { cell: ClusterInstStatus }) => {
-          const info = clusterInstStatus[cell] || clusterInstStatus.unavailable;
-          return <DbStatus theme={info.theme}>{info.text}</DbStatus>;
-        },
-      },
-      {
-        label: t('主访问入口'),
-        field: 'master_domain',
-        minWidth: 200,
-        showOverflowTooltip: false,
-        render: ({ data }: {data: TendbInstanceModel}) => (
-          <TextOverflowLayout>
-            {{
-              default: () => data.master_domain || '--',
-              append: () => data.master_domain && (
-                <db-icon
-                  v-bk-tooltips={t('复制主访问入口')}
-                  type="copy"
-                  onClick={() => copy(data.master_domain)} />
-              )
-            }}
-          </TextOverflowLayout>
-        )
-      },
-      {
-        label: t('从访问入口'),
-        field: 'slave_domain',
-        minWidth: 200,
-        showOverflowTooltip: false,
-        render: ({ data }: {data: TendbInstanceModel}) => (
-          <TextOverflowLayout>
-            {{
-              default: () => data.slave_domain || '--',
-              append: () => data.slave_domain && (
-                <db-icon
-                  v-bk-tooltips={t('复制从访问入口')}
-                  type="copy"
-                  onClick={() => copy(data.slave_domain)} />
-              )
-            }}
-          </TextOverflowLayout>
-        )
-      },
-      {
-        label: t('部署角色'),
-        field: 'role',
-        filter: {
-          list: columnAttrs.value.role,
-          checked: columnCheckedMap.value.role,
-        },
-      },
-      {
         label: t('部署时间'),
         field: 'create_at',
         sort: true,
@@ -273,7 +256,7 @@
         label: t('操作'),
         field: '',
         fixed: 'right',
-        width: 140,
+        width: 100,
         render: ({ data }: { data: TendbInstanceModel }) => (
           <auth-button
             action-id="tendbcluster_view"

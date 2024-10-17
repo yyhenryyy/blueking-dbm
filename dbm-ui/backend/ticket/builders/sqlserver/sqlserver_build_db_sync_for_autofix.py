@@ -49,15 +49,15 @@ class SQLServerBuildDBSyncForSerializer(SQLServerBaseOperateDetailSerializer):
         return attrs
 
 
-class SQLServerClearFlowParamBuilder(builders.FlowParamBuilder):
+class SQLServerBuildDBSyncParamBuilder(builders.FlowParamBuilder):
     controller = SqlserverController.ha_build_db_sync_scene
 
 
 @builders.BuilderFactory.register(TicketType.SQLSERVER_BUILD_DB_SYNC, is_apply=False)
-class SQLServerClearFlowBuilder(BaseSQLServerTicketFlowBuilder):
+class SQLServerBuildDBSyncBuilder(BaseSQLServerTicketFlowBuilder):
     serializer = SQLServerBuildDBSyncForSerializer
     alarm_transform_serializer = SQLServerBuildDBSyncForAutofixSerializer
-    inner_flow_builder = SQLServerClearFlowParamBuilder
+    inner_flow_builder = SQLServerBuildDBSyncParamBuilder
     inner_flow_name = _("SQLServer 同步数据")
     retry_type = FlowRetryType.MANUAL_RETRY
     default_need_itsm = False

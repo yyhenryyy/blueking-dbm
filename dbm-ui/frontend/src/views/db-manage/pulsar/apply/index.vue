@@ -365,21 +365,22 @@
   import { useI18n } from 'vue-i18n';
   import { useRoute, useRouter } from 'vue-router';
 
-  import type { BizItem, HostDetails } from '@services/types';
+  import type { BizItem, HostInfo } from '@services/types';
 
   import { useApplyBase } from '@hooks';
 
   import { OSTypes } from '@common/const';
 
-  // import AffinityItem from '@components/apply-items/AffinityItem.vue';
-  import BusinessItems from '@components/apply-items/BusinessItems.vue';
-  import CloudItem from '@components/apply-items/CloudItem.vue';
-  import ClusterAlias from '@components/apply-items/ClusterAlias.vue';
-  import ClusterName from '@components/apply-items/ClusterName.vue';
-  import DeployVersion from '@components/apply-items/DeployVersion.vue';
-  import RegionItem from '@components/apply-items/RegionItem.vue';
-  import SpecSelector from '@components/apply-items/SpecSelector.vue';
   import IpSelector from '@components/ip-selector/IpSelector.vue';
+
+  // import AffinityItem from '@views/db-manage/common/apply-items/AffinityItem.vue';
+  import BusinessItems from '@views/db-manage/common/apply-items/BusinessItems.vue';
+  import CloudItem from '@views/db-manage/common/apply-items/CloudItem.vue';
+  import ClusterAlias from '@views/db-manage/common/apply-items/ClusterAlias.vue';
+  import ClusterName from '@views/db-manage/common/apply-items/ClusterName.vue';
+  import DeployVersion from '@views/db-manage/common/apply-items/DeployVersion.vue';
+  import RegionItem from '@views/db-manage/common/apply-items/RegionItem.vue';
+  import SpecSelector from '@views/db-manage/common/apply-items/SpecSelector.vue';
 
   import { getInitFormdata } from './common/base';
 
@@ -486,7 +487,7 @@
     formdata.details.nodes.zookeeper = [];
   };
 
-  const makeMapByHostId = (hostList: HostDetails[]) =>
+  const makeMapByHostId = (hostList: HostInfo[]) =>
     hostList.reduce(
       (result, item) => ({
         ...result,
@@ -544,22 +545,22 @@
     return false;
   };
   // 更新 bookkeeper 节点
-  const handleBookkeeperIpListChange = (data: HostDetails[]) => {
+  const handleBookkeeperIpListChange = (data: HostInfo[]) => {
     formdata.details.nodes.bookkeeper = data;
   };
   // 更新 zookeeper 节点
-  const handleZookeeperIpListChange = (data: HostDetails[]) => {
+  const handleZookeeperIpListChange = (data: HostInfo[]) => {
     formdata.details.nodes.zookeeper = data;
   };
   // 更新 broker 节点
-  const handleBrokerIpListChange = (data: HostDetails[]) => {
+  const handleBrokerIpListChange = (data: HostInfo[]) => {
     formdata.details.nodes.broker = data;
   };
 
   const handleSubmit = () => {
     formRef.value.validate().then(() => {
       baseState.isSubmitting = true;
-      const mapIpField = (ipList: HostDetails[]) =>
+      const mapIpField = (ipList: HostInfo[]) =>
         ipList.map((item) => ({
           bk_host_id: item.host_id,
           ip: item.ip,

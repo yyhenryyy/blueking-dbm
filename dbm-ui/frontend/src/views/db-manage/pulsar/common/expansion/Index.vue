@@ -40,10 +40,10 @@
         <HostExpansion
           v-if="!isLoading"
           :key="nodeType"
-          v-model:expansionDisk="nodeInfoMap[nodeType].expansionDisk"
-          v-model:hostList="nodeInfoMap[nodeType].hostList"
-          v-model:resourceSpec="nodeInfoMap[nodeType].resourceSpec"
-          v-model:targetDisk="nodeInfoMap[nodeType].targetDisk"
+          v-model:expansion-disk="nodeInfoMap[nodeType].expansionDisk"
+          v-model:host-list="nodeInfoMap[nodeType].hostList"
+          v-model:resource-spec="nodeInfoMap[nodeType].resourceSpec"
+          v-model:target-disk="nodeInfoMap[nodeType].targetDisk"
           :cloud-info="{
             id: data.bk_cloud_id,
             name: data.bk_cloud_name,
@@ -66,7 +66,7 @@
   import type PulsarModel from '@services/model/pulsar/pulsar';
   import { getHostDetails } from '@services/source/ipchooser';
   import { createTicket } from '@services/source/ticket';
-  import type { HostDetails } from '@services/types';
+  import type { HostInfo } from '@services/types';
 
   import { useTicketMessage } from '@hooks';
 
@@ -76,8 +76,8 @@
 
   import HostExpansion, {
     type TExpansionNode,
-  } from '@components/cluster-common/host-expansion/Index.vue';
-  import NodeStatusList from '@components/cluster-common/host-expansion/NodeStatusList.vue';
+  } from '@views/db-manage/common/host-expansion/Index.vue';
+  import NodeStatusList from '@views/db-manage/common/host-expansion/NodeStatusList.vue';
 
   import { messageError } from '@utils';
 
@@ -178,7 +178,7 @@
       host_id: item.bk_host_id,
       meta: {
         bk_biz_id: item.bk_biz_id,
-        scope_id: item.bk_biz_id,
+        scope_id: `${item.bk_biz_id}`,
         scope_type: 'biz',
       },
     }));
@@ -187,12 +187,12 @@
     getHostDetails({
       host_list: hostIdList,
       scope_list: [{
-        scope_id: bizId,
+        scope_id: `${bizId}`,
         scope_type: 'biz',
       }],
     }).then((data) => {
-      const bookkeeperOriginalHostList: HostDetails[] = [];
-      const brokerOriginalHostList: HostDetails[] = [];
+      const bookkeeperOriginalHostList: HostInfo[] = [];
+      const brokerOriginalHostList: HostInfo[] = [];
 
       let bookkeeperDiskTotal = 0;
       let brokerDiskTotal = 0;

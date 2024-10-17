@@ -52,10 +52,11 @@
         :rule-obj="currentRule"
         @success="fetchData" />
       <ClusterAuthorize
+        ref="clusterAuthorizeRef"
         v-model="authorizeShow"
         :access-dbs="authorizeDbs"
         :account-type="AccountTypes.TENDBCLUSTER"
-        :cluster-types="[ClusterTypes.TENDBCLUSTER]"
+        :cluster-types="[ClusterTypes.TENDBCLUSTER, 'tendbclusterSlave']"
         :user="authorizeUser" />
     </div>
   </PermissionCatch>
@@ -64,19 +65,23 @@
 <script setup lang="tsx">
   import { useI18n } from 'vue-i18n';
 
-  import MysqlPermissonAccountModel from '@services/model/mysql-permisson/mysql-permission-account';
+  import MysqlPermissonAccountModel from '@services/model/mysql/mysql-permission-account';
   import { getPermissionRules } from '@services/source/permission';
   import type { PermissionRuleInfo } from '@services/types/permission';
+
+  import { useTicketCloneInfo, } from '@hooks';
 
   import {
     AccountTypes,
     ClusterTypes,
+    TicketTypes,
   } from '@common/const';
 
   import PermissionCatch from '@components/apply-permission/Catch.vue'
-  import ClusterAuthorize from '@components/cluster-authorize/ClusterAuthorize.vue';
   import DbTable from '@components/db-table/index.vue';
   import TextOverflowLayout from '@components/text-overflow-layout/Index.vue';
+
+  import ClusterAuthorize from '@views/db-manage/common/cluster-authorize/ClusterAuthorize.vue';
 
   import { getSearchSelectorParams } from '@utils';
 
@@ -88,10 +93,55 @@
 
   const { t } = useI18n();
 
+  useTicketCloneInfo({
+    type: TicketTypes.TENDBCLUSTER_AUTHORIZE_RULES,
+    onSuccess(cloneData) {
+      const {
+        dbs,
+        user,
+        clusterType,
+        clusterList,
+        sourceIpList,
+      } = cloneData;
+      authorizeShow.value = true;
+      authorizeDbs.value = dbs;
+      authorizeUser.value = user;
+      clusterAuthorizeRef.value!.initSelectorData({
+        clusterType,
+        clusterList,
+        sourceIpList,
+      });
+      window.changeConfirm = true;
+    },
+  });
+
+  useTicketCloneInfo({
+    type: TicketTypes.TENDBCLUSTER_AUTHORIZE_RULES,
+    onSuccess(cloneData) {
+      const {
+        dbs,
+        user,
+        clusterType,
+        clusterList,
+        sourceIpList,
+      } = cloneData;
+      authorizeShow.value = true;
+      authorizeDbs.value = dbs;
+      authorizeUser.value = user;
+      clusterAuthorizeRef.value!.initSelectorData({
+        clusterType,
+        clusterList,
+        sourceIpList,
+      });
+      window.changeConfirm = true;
+    },
+  });
+
   const setRowClass = (row: MysqlPermissonAccountModel) => (row.isNew ? 'is-new' : '');
 
   const { deleteAccountReq } = useDeleteAccount();
 
+  const clusterAuthorizeRef = ref<InstanceType<typeof ClusterAuthorize>>();
   const tableRef = ref<InstanceType<typeof DbTable>>();
   const tableSearch = ref([]);
   const currentRule = ref({} as MysqlPermissonAccountModel['rules'][number])

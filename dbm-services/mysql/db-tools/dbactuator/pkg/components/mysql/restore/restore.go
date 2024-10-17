@@ -36,12 +36,15 @@ type RestoreParam struct {
 	// 恢复本地的目标实例
 	TgtInstance native.InsObject `json:"tgt_instance"`
 	// 备份实例的 ip port，用于生产 change master 语句。如果 host 为空，表示不检查、不生成change master，恢复spider节点时使用
+	// source_instance
+	// source -> second
 	SrcInstance native.Instance `json:"src_instance"`
 	// 恢复完成后是否执行 change master，会 change master 到 src_instance
 	ChangeMaster bool `json:"change_master"`
 	// work_id 标识本次恢复，若为0则为当前时间戳
 	WorkID string `json:"work_id"`
 	// 恢复选项，比如恢复库表、是否导入binlog等。目前只对逻辑恢复有效
+	// 重建 slave时，这里可不传
 	RestoreOpt *RestoreOpt `json:"restore_opts"`
 }
 

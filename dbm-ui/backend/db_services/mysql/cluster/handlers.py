@@ -12,7 +12,7 @@ import copy
 from collections import defaultdict
 from typing import Any, Dict, List
 
-from django.db.models import Q
+from django.db.models import Q, Value
 from django.db.models.query import QuerySet
 from django.forms import model_to_dict
 
@@ -87,8 +87,10 @@ class ClusterServiceHandler(BaseClusterServiceHandler):
             bk_biz_id=self.bk_biz_id,
         )
 
-        clusters: QuerySet = Cluster.objects.prefetch_related("storageinstance_set", "proxyinstance_set").filter(
-            filter_conditions
+        clusters: QuerySet = (
+            Cluster.objects.prefetch_related("storageinstance_set", "proxyinstance_set")
+            .filter(filter_conditions)
+            .distinct()
         )
         cluster_db_module_ids: List[int] = [cluster.db_module_id for cluster in clusters]
         db_module_names: Dict[int, str] = {
@@ -145,6 +147,9 @@ class ClusterServiceHandler(BaseClusterServiceHandler):
         ]
         return remote_pair_infos
 
+    def find_related_clusters_by_instances(self, instances: List[DBInstance]) -> List[Dict[str, Any]]:
+        return super().find_related_clusters_by_instances(instances, same_role=True)
+
     def _get_instance_objs(self, instances: List[DBInstance]):
         """
         根据instance(属DBInstance类)查询数据库实例，注意这里要考虑混布的情况
@@ -165,6 +170,7 @@ class ClusterServiceHandler(BaseClusterServiceHandler):
                     Q(machine__bk_host_id__in=bk_host_ids)
                     & Q(tendbclusterspiderext__spider_role=TenDBClusterSpiderRole.SPIDER_MASTER.value)
                 )
+                .annotate(role=Value("spider_ctl"))
             )
             # 覆写port为admin port
             for instance in controller_instances:

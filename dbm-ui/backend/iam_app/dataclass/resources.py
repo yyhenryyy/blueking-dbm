@@ -89,7 +89,7 @@ class ResourceMeta(metaclass=abc.ABCMeta):
         try:
             instance = instance or model.objects.get(pk=instance_id)
         except model.DoesNotExist:
-            return resource, None
+            raise ResourceNotExistError(_("未找到模型[{}]的实例[{}]").format(model.__name__, instance_id))
 
         display_fields = ResourceEnum.get_resource_by_id(cls.id).display_fields
         instance_name_values = [str(getattr(instance, _field)) for _field in display_fields]
@@ -512,7 +512,7 @@ class MySQLAccountResourceMeta(AccountResourceMeta):
 
 @dataclass
 class SQLServerAccountResourceMeta(AccountResourceMeta):
-    """MySQL账号实例resource 属性定义"""
+    """SQLServer账号实例resource 属性定义"""
 
     id: str = "sqlserver_account"
     name: str = _("SQLServer 账号")
@@ -520,7 +520,7 @@ class SQLServerAccountResourceMeta(AccountResourceMeta):
 
 @dataclass
 class MongoDBAccountResourceMeta(AccountResourceMeta):
-    """MySQL账号实例resource 属性定义"""
+    """MongoDB账号实例resource 属性定义"""
 
     id: str = "mongodb_account"
     name: str = _("MongoDB 账号")
@@ -528,7 +528,7 @@ class MongoDBAccountResourceMeta(AccountResourceMeta):
 
 @dataclass
 class TendbClusterAccountResourceMeta(AccountResourceMeta):
-    """MySQL账号实例resource 属性定义"""
+    """Tendb账号实例resource 属性定义"""
 
     id: str = "tendbcluster_account"
     name: str = _("TendbCluster 账号")

@@ -28,8 +28,10 @@
           :data="item"
           :removeable="tableData.length < 2"
           @add="(payload: Array<IDataRow>) => handleAppend(index, payload)"
+          @clone="(payload: IDataRow) => handleClone(index, payload)"
           @remove="handleRemove(index)" />
       </RenderData>
+      <TicketRemark v-model="remark" />
       <IpSelector
         v-model:show-dialog="isShowIpSelector"
         :biz-id="currentBizId"
@@ -67,13 +69,16 @@
 
   import { precheckPermissionClone } from '@services/source/permission';
   import { createTicket } from '@services/source/ticket';
-  import type { HostDetails } from '@services/types';
+  import type { HostInfo } from '@services/types';
+
+  import { useTicketCloneInfo } from '@hooks';
 
   import { useGlobalBizs } from '@stores';
 
-  import { OSTypes } from '@common/const';
+  import { OSTypes, TicketTypes } from '@common/const';
 
   import IpSelector from '@components/ip-selector/IpSelector.vue';
+  import TicketRemark from '@components/ticket-remark/Index.vue';
 
   import RenderData from './components/RenderData/Index.vue';
   import RenderDataRow, { createRowData, type IDataRow } from './components/RenderData/Row.vue';
@@ -82,12 +87,24 @@
   const router = useRouter();
   const { currentBizId } = useGlobalBizs();
 
+  // 单据克隆
+  useTicketCloneInfo({
+    type: TicketTypes.TENDBCLUSTER_CLIENT_CLONE_RULES,
+    onSuccess(cloneData) {
+      const { tableDataList } = cloneData;
+      tableData.value = tableDataList;
+      remark.value = cloneData.remark;
+      window.changeConfirm = true;
+    },
+  });
+
   const rowRefs = ref();
   const isShowIpSelector = ref(false);
   const isSubmitting = ref(false);
+  const remark = ref('');
 
   const tableData = shallowRef<Array<IDataRow>>([createRowData({})]);
-  const selectedIps = shallowRef<HostDetails[]>([]);
+  const selectedIps = shallowRef<HostInfo[]>([]);
 
   let ipMemo = {} as Record<string, boolean>;
 
@@ -105,7 +122,7 @@
     isShowIpSelector.value = true;
   };
 
-  const handleHostChange = (data: HostDetails[]) => {
+  const handleHostChange = (data: HostInfo[]) => {
     selectedIps.value = data;
     const newList = data.reduce((result, item) => {
       const { ip } = item;
@@ -148,6 +165,16 @@
     }
   };
 
+  // 复制行数据
+  const handleClone = (index: number, sourceData: IDataRow) => {
+    const dataList = [...tableData.value];
+    dataList.splice(index + 1, 0, sourceData);
+    tableData.value = dataList;
+    setTimeout(() => {
+      rowRefs.value[rowRefs.value.length - 1].getValue();
+    });
+  };
+
   const handleSubmit = async () => {
     try {
       isSubmitting.value = true;
@@ -163,9 +190,9 @@
       }
 
       await createTicket({
-        ticket_type: 'TENDBCLUSTER_CLIENT_CLONE_RULES',
+        ticket_type: TicketTypes.TENDBCLUSTER_CLIENT_CLONE_RULES,
         bk_biz_id: currentBizId,
-        remark: '',
+        remark: remark.value,
         details: {
           ...precheckResult,
           clone_type: 'client',
@@ -189,6 +216,7 @@
   };
 
   const handleReset = () => {
+    remark.value = '';
     tableData.value = [createRowData()];
     ipMemo = {};
     selectedIps.value = [];

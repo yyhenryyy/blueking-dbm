@@ -170,7 +170,7 @@
   import _ from 'lodash';
   import { useI18n } from 'vue-i18n';
 
-  import type HdfsModel from '@services/model/hdfs/hdfs';
+  import type HdfsDetailModel from '@services/model/hdfs/hdfs-detail';
   import HdfsNodeModel from '@services/model/hdfs/hdfs-node';
   import { getHdfsDetail, getHdfsNodeList } from '@services/source/hdfs';
 
@@ -183,10 +183,10 @@
 
   import { ClusterTypes } from '@common/const';
 
-  import OperationBtnStatusTips from '@components/cluster-common/OperationBtnStatusTips.vue';
-  import RenderClusterRole from '@components/cluster-common/RenderRole.vue';
   import RenderHostStatus from '@components/render-host-status/Index.vue';
 
+  import OperationBtnStatusTips from '@views/db-manage/common/OperationBtnStatusTips.vue';
+  import RenderClusterRole from '@views/db-manage/common/RenderRole.vue';
   import ClusterExpansion from '@views/db-manage/hdfs/common/expansion/Index.vue';
   import ClusterReplace from '@views/db-manage/hdfs/common/replace/Index.vue';
   import ClusterShrink from '@views/db-manage/hdfs/common/shrink/Index.vue';
@@ -239,6 +239,24 @@
     return options;
   };
 
+  const checkNodeReplaceDisable = (node: HdfsNodeModel) => {
+    const options = {
+      disabled: false,
+      tooltips: {
+        disabled: true,
+        content: '',
+      },
+    };
+
+    if (!node.isDataNode) {
+      options.disabled = true;
+      options.tooltips.disabled = false;
+      options.tooltips.content = t('节点类型不支持替换');
+    }
+
+    return options;
+  };
+
   const globalBizsStore = useGlobalBizs();
   const copy = useCopy();
   const { t, locale } = useI18n();
@@ -272,7 +290,7 @@
   const isShowDetail = ref(false);
   const isCopyDropdown = ref(false);
 
-  const operationData = shallowRef<HdfsModel>();
+  const operationData = shallowRef<HdfsDetailModel>();
   const operationNodeData = shallowRef();
   const operationNodeList = shallowRef<Array<HdfsNodeModel>>([]);
   const tableData = shallowRef<HdfsNodeModel[]>([]);
@@ -342,7 +360,7 @@
     if (_.find(selectList, item => !item.isDataNode)) {
       options.disabled = true;
       options.tooltips.disabled = false;
-      options.tooltips.content = t('仅DataNode类型的节点支持缩容');
+      options.tooltips.content = t('仅DataNode类型的节点支持替换');
       return options;
     }
     return options;
@@ -371,6 +389,7 @@
       label: t('节点IP'),
       field: 'ip',
       showOverflowTooltip: false,
+      width: 120,
       render: ({ data }: { data: HdfsNodeModel }) => (
       <div style="display: flex; align-items: center;">
         <div class="text-overflow" v-overflow-tips>
@@ -428,6 +447,7 @@
       label: t('部署时间'),
       field: 'create_at',
       sort: true,
+      width: 250,
       render: ({ data }: {data: HdfsNodeModel}) => <span>{data.createAtDisplay}</span>,
     },
     {
@@ -436,6 +456,7 @@
       fixed: 'right',
       render: ({ data }: { data: HdfsNodeModel }) => {
         const shrinkDisableTooltips = checkNodeShrinkDisable(data);
+        const replaceDisableTooltips = checkNodeReplaceDisable(data);
         return (
           <>
             <OperationBtnStatusTips
@@ -458,17 +479,17 @@
               v-db-console="hdfs.nodeList.replace"
               data={operationData.value}>
               <span v-bk-tooltips={{
-                  content: t('节点类型不支持替换'),
-                  disabled: data.isDataNode,
-                }}>
-                <auth-button
+                content: t('节点类型不支持替换'),
+                disabled: data.isDataNode,
+              }}>
+              <auth-button
                 text
                 theme="primary"
                 action-id="hdfs_replace"
                 permission={data.permission.hdfs_replace}
                 resource={data.bk_host_id}
                 class="ml8"
-                disabled={operationData.value?.operationDisabled}
+                disabled={replaceDisableTooltips.disabled || operationData.value?.operationDisabled}
                 onClick={() => handleReplaceOne(data)}
               >
                 {t('替换')}

@@ -123,6 +123,7 @@
             </div>
           </div>
         </BkRadio>
+        <TicketRemark v-model="remark" />
       </div>
     </BkRadioGroup>
     <div class="btns">
@@ -154,8 +155,7 @@
 
   import RedisDSTHistoryJobModel from '@services/model/redis/redis-dst-history-job';
   import { createTicket } from '@services/source/ticket';
-  import { ExecuteModes, RepairModes } from '@services/types/common';
-  import type { SubmitTicket } from '@services/types/ticket';
+  import { ExecuteModes, RepairModes } from '@services/types';
 
   import { useTicketCloneInfo } from '@hooks';
 
@@ -163,21 +163,12 @@
 
   import { LocalStorageKeys, TicketTypes } from '@common/const';
 
+  import TicketRemark from '@components/ticket-remark/Index.vue';
+
   import { formatDatetime } from '@views/db-manage/redis/common/utils';
 
   import BasicInfoTable from './basic-info-table/Index.vue';
   import { type IDataRow, type InfoItem } from './basic-info-table/Row.vue';
-
-  type SubmitType = SubmitTicket<TicketTypes, InfoItem[]> & {
-    details: {
-      execute_mode: ExecuteModes; // 执行模式
-      specified_execution_time: string; // 定时执行,指定执行时间
-      check_stop_time: string; // 校验终止时间,
-      keep_check_and_repair: boolean; // 是否一直保持校验
-      data_repair_enabled: boolean; // 是否修复数据
-      repair_mode: RepairModes;
-    };
-  };
 
   const { t } = useI18n();
   const router = useRouter();
@@ -196,6 +187,7 @@
       isKeepCheckAndRepair.value = isKeepCheck;
       isRepairData.value = isRepairEnable;
       repairMode.value = repairType;
+      remark.value = cloneData.remark;
       window.changeConfirm = true;
     },
   });
@@ -212,6 +204,7 @@
   const isSubmitting = ref(false);
   const tableRef = ref();
   const isKeepCheckAndRepair = ref(true);
+  const remark = ref('');
 
   const tableData = shallowRef<IDataRow[]>([]);
 
@@ -241,9 +234,10 @@
   // 提交
   const handleSubmit = async () => {
     const infos = (await tableRef.value.getValue()) as InfoItem[];
-    const params: SubmitType = {
+    const params = {
       bk_biz_id: currentBizId,
       ticket_type: TicketTypes.REDIS_DATACOPY_CHECK_REPAIR,
+      remark: remark.value,
       details: {
         execute_mode: executeMode.value,
         specified_execution_time:
@@ -288,6 +282,7 @@
     repairMode.value = RepairModes.AUTO_REPAIR;
     overtime.value = 0;
     tableData.value = [];
+    remark.value = '';
     setTimeout(() => {
       recoverDataListFromLocalStorage();
     });

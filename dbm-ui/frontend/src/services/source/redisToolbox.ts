@@ -12,8 +12,7 @@
  */
 import http from '@services/http';
 import RedisModel from '@services/model/redis/redis';
-
-import type { ListBase } from '../types';
+import type { ListBase } from '@services/types';
 
 const getRootPath = () => `/apis/redis/bizs/${window.PROJECT_CONFIG.BIZ_ID}/toolbox`;
 
@@ -106,4 +105,22 @@ export function findRelatedClustersByClusterIds(params: { cluster_ids: number[] 
       related_clusters: Array<RedisModel>;
     }>
   >(`${getRootPath()}/find_related_clusters_by_cluster_ids/`, params);
+}
+
+/**
+ * 通过集群查询同机关联集群
+ */
+export function getRedisClusterCapacityUpdateInfo(params: {
+  cluster_id: number;
+  new_storage_version: string;
+  new_spec_id: number;
+  new_machine_group_num: number;
+  new_shards_num: number;
+}) {
+  return http.get<{
+    capacity_update_type: string; // 原地变更(keep_current_machines)、替换变更(all_machines_replace)
+    require_spec_id: number;
+    require_machine_group_num: number;
+    err_msg: string;
+  }>(`${getRootPath()}/get_cluster_capacity_update_info/`, params);
 }

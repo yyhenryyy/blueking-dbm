@@ -108,13 +108,10 @@
         :cluster-id="operationData.id" />
     </BkSideslider>
   </div>
-  <EditEntryConfig
-    :id="clusterId"
-    v-model:is-show="showEditEntryConfig"
-    :get-detail-info="getHdfsDetail" />
 </template>
 <script setup lang="tsx">
   import { InfoBox, Message } from 'bkui-vue';
+  import type { ISearchItem } from 'bkui-vue/lib/search-select/utils';
   import { useI18n } from 'vue-i18n';
   import {
     useRoute,
@@ -142,23 +139,24 @@
 
   import {
     ClusterTypes,
+    DBTypes,
     UserPersonalSettings,
   } from '@common/const';
 
-  import ClusterCapacityUsageRate from '@components/cluster-capacity-usage-rate/Index.vue'
-  import OperationBtnStatusTips from '@components/cluster-common/OperationBtnStatusTips.vue';
-  import RenderNodeInstance from '@components/cluster-common/RenderNodeInstance.vue';
-  import RenderOperationTag from '@components/cluster-common/RenderOperationTag.vue';
-  import RenderPassword from '@components/cluster-common/RenderPassword.vue';
-  import RenderClusterStatus from '@components/cluster-common/RenderStatus.vue';
-  import EditEntryConfig from '@components/cluster-entry-config/Index.vue';
+  import RenderClusterStatus from '@components/cluster-status/Index.vue';
   import DbTable from '@components/db-table/index.vue';
-  import DropdownExportExcel from '@components/dropdown-export-excel/index.vue';
   import TextOverflowLayout from '@components/text-overflow-layout/Index.vue';
 
+  import ClusterCapacityUsageRate from '@views/db-manage/common/cluster-capacity-usage-rate/Index.vue'
+  import EditEntryConfig from '@views/db-manage/common/cluster-entry-config/Index.vue';
   import ClusterIpCopy from '@views/db-manage/common/cluster-ip-copy/Index.vue';
+  import DropdownExportExcel from '@views/db-manage/common/dropdown-export-excel/index.vue';
+  import OperationBtnStatusTips from '@views/db-manage/common/OperationBtnStatusTips.vue';
   import RenderCellCopy from '@views/db-manage/common/render-cell-copy/Index.vue';
   import RenderHeadCopy from '@views/db-manage/common/render-head-copy/Index.vue';
+  import RenderNodeInstance from '@views/db-manage/common/RenderNodeInstance.vue';
+  import RenderOperationTag from '@views/db-manage/common/RenderOperationTag.vue';
+  import RenderPassword from '@views/db-manage/common/RenderPassword.vue';
   import ClusterExpansion from '@views/db-manage/hdfs/common/expansion/Index.vue';
   import ClusterShrink from '@views/db-manage/hdfs/common/shrink/Index.vue';
 
@@ -169,11 +167,6 @@
   } from '@utils';
 
   import ClusterSettings from './components/ClusterSettings.vue';
-
-  import type {
-    SearchSelectData,
-    SearchSelectItem,
-  } from '@/types/bkui-vue';
 
   const clusterId = defineModel<number>('clusterId');
 
@@ -227,8 +220,6 @@
   const isShowPassword = ref(false);
   const isShowSettings = ref(false);
   const isInit = ref(true);
-  const showEditEntryConfig = ref(false);
-
   const operationData = shallowRef<HdfsModel>();
   const selected = ref<HdfsModel[]>([])
   const selectedIds = computed(() => selected.value.map(item => item.id));
@@ -308,7 +299,7 @@
       multiple: true,
       children: searchAttrs.value.time_zone,
     },
-  ] as SearchSelectData);
+  ]);
 
   const getRowClass = (data: HdfsModel) => {
     const classList = [data.isOnline ? '' : 'is-offline'];
@@ -391,17 +382,14 @@
                       ]
                     } />
                   )}
-                  <auth-button
-                    v-bk-tooltips={t('修改入口配置')}
-                    v-db-console="hdfs.clusterManage.modifyEntryConfiguration"
-                    action-id="access_entry_edit"
-                    resource="hdfs"
-                    permission={data.permission.access_entry_edit}
-                    text
-                    theme="primary"
-                    onClick={() => handleOpenEntryConfig(data)}>
-                    <db-icon type="edit" />
-                  </auth-button>
+                  <span v-db-console="hdfs.clusterManage.modifyEntryConfiguration">
+                    <EditEntryConfig
+                      id={data.id}
+                      getDetailInfo={getHdfsDetail}
+                      permission={data.permission.access_entry_edit}
+                      resource={DBTypes.HDFS}
+                      onSuccess={fetchTableData} />
+                  </span>
                 </>
               ),
             }}
@@ -713,6 +701,7 @@
                 text
                 theme="primary"
                 action-id="hdfs_enable_disable"
+                disabled={data.isStarting}
                 permission={data.permission.hdfs_enable_disable}
                 v-db-console="hdfs.clusterManage.enable"
                 resource={data.id}
@@ -820,6 +809,7 @@
       'hdfs_journalnode',
       'hdfs_datanode',
     ],
+    showLineHeight: false,
     trigger: 'manual' as const,
   };
 
@@ -828,7 +818,7 @@
     updateTableSettings,
   } = useTableSettings(UserPersonalSettings.HDFS_TABLE_SETTINGS, defaultSettings);
 
-  const getMenuList = async (item: SearchSelectItem | undefined, keyword: string) => {
+  const getMenuList = async (item: ISearchItem | undefined, keyword: string) => {
     if (item?.id !== 'creator' && keyword) {
       return getMenuListSearch(item, keyword, serachData.value, searchValue.value);
     }
@@ -855,11 +845,6 @@
 
     // 不需要远层加载
     return serachData.value.find(set => set.id === item.id)?.children || [];
-  };
-
-  const handleOpenEntryConfig = (row: HdfsModel) => {
-    showEditEntryConfig.value  = true;
-    clusterId.value = row.id;
   };
 
   const fetchTableData = (loading?:boolean) => {
@@ -1078,7 +1063,7 @@
         align-items: center;
       }
 
-      .db-icon-edit {
+      .db-icon-visible1 {
         display: none;
         margin-left: 4px;
         color: @primary-color;
@@ -1087,7 +1072,7 @@
     }
 
     :deep(tr:hover) {
-      .db-icon-edit {
+      .db-icon-visible1 {
         display: inline-block !important;
       }
     }

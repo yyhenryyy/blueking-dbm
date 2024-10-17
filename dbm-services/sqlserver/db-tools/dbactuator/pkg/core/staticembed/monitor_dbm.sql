@@ -124,8 +124,8 @@ GO
 
 IF DB_ID('Monitor') IS NOT NULL
 BEGIN
-	ALTER DATABASE Monitor SET SINGLE_USER WITH ROLLBACK IMMEDIATE
-	DROP DATABASE Monitor
+	ALTER DATABASE [Monitor] SET SINGLE_USER WITH ROLLBACK IMMEDIATE
+	DROP DATABASE [Monitor]
 END
 
 --****************************************** DATABASE ****************************************
@@ -960,14 +960,14 @@ BEGIN
 			BEGIN
 				IF EXISTS (SELECT name FROM sys.databases WHERE name = @dr)
 				BEGIN
-					SET @cmd='DROP DATABASE '+@dr
+					SET @cmd='DROP DATABASE ['+@dr+']'
 					EXEC (@cmd)
 					
 					SET @cmd2='EXEC MASTER.DBO.xp_cmdshell ''del /q d:\gamedb\'+@dr+'.'+@port+'.*.spst'';'
 					EXEC (@cmd2)
 				END
 
-				select @filename=null,@cmd='',@fileid=0,@cmd='CREATE DATABASE '+@dr+' ON '
+				select @filename=null,@cmd='',@fileid=0,@cmd='CREATE DATABASE ['+@dr+'] ON '
 				declare cur1 cursor for select name from sys.master_files where database_id=@dbid and type_desc='ROWS' and state_desc='ONLINE'
 				open cur1
 				while 1=1
@@ -981,7 +981,7 @@ BEGIN
 				close cur1
 				deallocate cur1	
     
-				set @cmd=left(@cmd,len(@cmd)-1)+' AS SNAPSHOT OF '+@db    
+				set @cmd=left(@cmd,len(@cmd)-1)+' AS SNAPSHOT OF ['+@db+']'
 				
 				BEGIN TRY
 					EXEC (@cmd)
@@ -2728,7 +2728,7 @@ BEGIN TRY
 		WHILE @@FETCH_STATUS = 0
 		BEGIN
 				--强制故障切换
-				set @strsql='Use master  alter database '+@dbname+' set partner FORCE_SERVICE_ALLOW_DATA_LOSS;'
+				set @strsql='Use master  alter database ['+@dbname+'] set partner FORCE_SERVICE_ALLOW_DATA_LOSS;'
 				exec(@strsql)
 				if @@error>0
 				begin
@@ -2936,7 +2936,7 @@ BEGIN TRY
 		WHILE @@FETCH_STATUS = 0
 		BEGIN
 				--强制故障切换
-				set @strsql='Use master  alter database '+@dbname+' set partner FORCE_SERVICE_ALLOW_DATA_LOSS;'
+				set @strsql='Use master  alter database ['+@dbname+'] set partner FORCE_SERVICE_ALLOW_DATA_LOSS;'
 				exec(@strsql)
 				if @@error>0
 				begin
@@ -3036,12 +3036,6 @@ BEGIN
 		@SHRINK_SIZE BIGINT,
 		@ERROR_MESSAGE VARCHAR(4000)
 
-	IF @BACKUP_ID=''
-	BEGIN
-		SET @BACKUP_ID=CONVERT(VARCHAR(36),NEWID())
-	END
-	
-
 	--获取备份配置数据
 	SELECT @APP = APP,
 		@FULL_BACKUP_PATH = FULL_BACKUP_PATH,
@@ -3074,7 +3068,16 @@ BEGIN
 		@SHRINK_SIZE=ISNULL(SHRINK_SIZE,200)
 	FROM DBO.APP_SETTING
 	
-	IF @DATA_SCHEMA_GRANT<>'ALL'
+	IF @BACKUP_ID=''
+	BEGIN
+		SET @BACKUP_ID=CONVERT(VARCHAR(36),NEWID())
+	END
+	ELSE
+	BEGIN
+		SET @DATA_SCHEMA_GRANT='all'
+	END
+	
+	IF @DATA_SCHEMA_GRANT<>'all'
 		return
 
 	IF @BACKUP_FILETAG<>''
@@ -3174,30 +3177,30 @@ BEGIN
 		--开始备份
 		SET @SQL = NULL
 		SELECT @SQL = ISNULL(@SQL+CHAR(13),'')+'
-		DECLARE @SUCCESS_'+NAME+' INT = 0,@CHECKER_'+NAME+' INT = 0
-		DECLARE @STARTTIME_'+NAME+' VARCHAR(25) = CONVERT(CHAR(19),GETDATE(),120),
-			@STARTTIME_SHORT_'+NAME+' VARCHAR(25) =REPLACE(REPLACE(REPLACE(CONVERT(CHAR(19),GETDATE(),120),'':'',''''),''-'',''''),'' '','''')
-		DECLARE @FILENAME_'+NAME+' VARCHAR(4000) = '''+NAME+'__'+@APP+'_'+@IP+'_'+LTRIM(@PORT)+'_''+@STARTTIME_SHORT_'+NAME+'+'''+@SUFFIX+'''
-		DECLARE @FULLFILENAME_'+NAME+' VARCHAR(4000) = '''+@BACKUP_PATH+'''+@FILENAME_'+NAME+'
-		EXEC @CHECKER_'+NAME+' = DBO.TOOL_CHECK_DISK_FREE_SIZE '''+@BACKUP_PATH+''','+LTRIM(@DISK_MIN_SIZE_MB)+'
-		IF @CHECKER_'+NAME+' = 1
+		DECLARE @SUCCESS_'+replace(NAME,'-','#')+' INT = 0,@CHECKER_'+replace(NAME,'-','#')+' INT = 0
+		DECLARE @STARTTIME_'+replace(NAME,'-','#')+' VARCHAR(25) = CONVERT(CHAR(19),GETDATE(),120),
+			@STARTTIME_SHORT_'+replace(NAME,'-','#')+' VARCHAR(25) =REPLACE(REPLACE(REPLACE(CONVERT(CHAR(19),GETDATE(),120),'':'',''''),''-'',''''),'' '','''')
+		DECLARE @FILENAME_'+replace(NAME,'-','#')+' VARCHAR(4000) = '''+NAME+'__'+@APP+'_'+@IP+'_'+LTRIM(@PORT)+'_''+@STARTTIME_SHORT_'+replace(NAME,'-','#')+'+'''+@SUFFIX+'''
+		DECLARE @FULLFILENAME_'+replace(NAME,'-','#')+' VARCHAR(4000) = '''+@BACKUP_PATH+'''+@FILENAME_'+replace(NAME,'-','#')+'
+		EXEC @CHECKER_'+replace(NAME,'-','#')+' = DBO.TOOL_CHECK_DISK_FREE_SIZE '''+@BACKUP_PATH+''','+LTRIM(@DISK_MIN_SIZE_MB)+'
+		IF @CHECKER_'+replace(NAME,'-','#')+' = 1
 		BEGIN
-			IF '+LTRIM(@TYPE)+' <> 1 AND NOT EXISTS(select 1 from msdb.dbo.backupset a, msdb.dbo.backupmediafamily b where a.media_set_id = b.media_set_id and a.database_name = '''+NAME+''' and backup_finish_date between getdate()-2 and getdate())
+			IF '+LTRIM(@TYPE)+' <> 1 AND NOT EXISTS(select 1 from msdb.dbo.backupset a, msdb.dbo.backupmediafamily b where a.media_set_id = b.media_set_id and a.database_name = '''+replace(NAME,'-','#')+''' and backup_finish_date between getdate()-2 and getdate())
 			BEGIN
-				DECLARE @NEWFULLFILENAME_'+NAME+' VARCHAR(4000) = REPLACE(REPLACE(@FULLFILENAME_'+NAME+','''+@SUFFIX+''',''.bak''),'''+@BACKUP_PATH+''','''+@FULL_BACKUP_PATH+''')
-				EXEC @SUCCESS_'+NAME+' = DBO.TOOL_BACKUP_DATABASE_OPERATOR 1,'''+NAME+''',@NEWFULLFILENAME_'+NAME+'
+				DECLARE @NEWFULLFILENAME_'+replace(NAME,'-','#')+' VARCHAR(4000) = REPLACE(REPLACE(@FULLFILENAME_'+replace(NAME,'-','#')+','''+@SUFFIX+''',''.bak''),'''+@BACKUP_PATH+''','''+@FULL_BACKUP_PATH+''')
+				EXEC @SUCCESS_'+replace(NAME,'-','#')+' = DBO.TOOL_BACKUP_DATABASE_OPERATOR 1,'''+NAME+''',@NEWFULLFILENAME_'+replace(NAME,'-','#')+'
 			END
-			EXEC @SUCCESS_'+NAME+' = DBO.TOOL_BACKUP_DATABASE_OPERATOR '+LTRIM(@TYPE)+','''+NAME+''',@FULLFILENAME_'+NAME+'
+			EXEC @SUCCESS_'+replace(NAME,'-','#')+' = DBO.TOOL_BACKUP_DATABASE_OPERATOR '+LTRIM(@TYPE)+','''+NAME+''',@FULLFILENAME_'+replace(NAME,'-','#')+'
 		END
-		DECLARE @ENDTIME_'+NAME+' VARCHAR(25) = CONVERT(CHAR(19),GETDATE(),120)
+		DECLARE @ENDTIME_'+replace(NAME,'-','#')+' VARCHAR(25) = CONVERT(CHAR(19),GETDATE(),120)
 		INSERT INTO DBO.BACKUP_TRACE(BACKUP_ID,DBNAME,[PATH],FILENAME,TYPE,STARTTIME,ENDTIME,FILESIZE,MD5CODE,SUCCESS,UPLOADED,WRITETIME)
-		VALUES('''+@BACKUP_ID+''','''+NAME+''','''+@BACKUP_PATH+''',@FILENAME_'+NAME+','+LTRIM(@TYPE)+',@STARTTIME_'+NAME+',@ENDTIME_'+NAME+',0,0,@SUCCESS_'+NAME+',0,GETDATE())'
+		VALUES('''+@BACKUP_ID+''','''+NAME+''','''+@BACKUP_PATH+''',@FILENAME_'+replace(NAME,'-','#')+','+LTRIM(@TYPE)+',@STARTTIME_'+replace(NAME,'-','#')+',@ENDTIME_'+replace(NAME,'-','#')+',0,0,@SUCCESS_'+replace(NAME,'-','#')+',0,GETDATE())'
 		FROM DBO.BACKUP_DBLIST WHERE NAME in(select RowValue from dbo.SplitStringByRow(@DBLIST,','))
 		--PRINT(@SQL)
 		EXEC (@SQL)
 	END TRY
 	BEGIN CATCH
-		PRINT '~~ error in backup database ~~'
+	PRINT '~~ error in backup database ~~'
 	END CATCH
 
 	SET @BACKUP_TASK_END_TIME=convert(varchar(19),getdate(),121)

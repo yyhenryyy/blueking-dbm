@@ -123,10 +123,6 @@
     <RedisPurge
       v-model:is-show="purgeState.isShow"
       :data="purgeState.data" />
-    <EditEntryConfig
-      :id="clusterId"
-      v-model:is-show="showEditEntryConfig"
-      :get-detail-info="getRedisDetail" />
   </div>
 </template>
 
@@ -145,9 +141,6 @@
   } from '@services/source/redis';
   import { createTicket } from '@services/source/ticket';
   import { getUserList } from '@services/source/user';
-  import {
-    ClusterNodeKeys,
-  } from '@services/types/clusters';
 
   import {
     useCopy,
@@ -168,20 +161,20 @@
     UserPersonalSettings
   } from '@common/const';
 
-  import ClusterCapacityUsageRate from '@components/cluster-capacity-usage-rate/Index.vue'
-  import OperationBtnStatusTips from '@components/cluster-common/OperationBtnStatusTips.vue';
-  import RenderOperationTag from '@components/cluster-common/RenderOperationTag.vue';
-  import EditEntryConfig from '@components/cluster-entry-config/Index.vue';
   import DbStatus from '@components/db-status/index.vue';
   import DbTable from '@components/db-table/index.vue';
-  import DropdownExportExcel from '@components/dropdown-export-excel/index.vue';
   import MoreActionExtend from '@components/more-action-extend/Index.vue';
-  import RenderInstances from '@components/render-instances/RenderInstances.vue';
   import TextOverflowLayout from '@components/text-overflow-layout/Index.vue';
 
+  import ClusterCapacityUsageRate from '@views/db-manage/common/cluster-capacity-usage-rate/Index.vue'
+  import EditEntryConfig from '@views/db-manage/common/cluster-entry-config/Index.vue';
   import ClusterIpCopy from '@views/db-manage/common/cluster-ip-copy/Index.vue';
+  import DropdownExportExcel from '@views/db-manage/common/dropdown-export-excel/index.vue';
+  import OperationBtnStatusTips from '@views/db-manage/common/OperationBtnStatusTips.vue';
   import RenderCellCopy from '@views/db-manage/common/render-cell-copy/Index.vue';
   import RenderHeadCopy from '@views/db-manage/common/render-head-copy/Index.vue';
+  import RenderInstances from '@views/db-manage/common/render-instances/RenderInstances.vue';
+  import RenderOperationTag from '@views/db-manage/common/RenderOperationTag.vue';
   import RedisBackup from '@views/db-manage/redis/common/cluster-oprations/Backup.vue';
   import ClusterPassword from '@views/db-manage/redis/common/cluster-oprations/ClusterPassword.vue';
   import DeleteKeys from '@views/db-manage/redis/common/cluster-oprations/DeleteKeys.vue';
@@ -193,6 +186,12 @@
     getSearchSelectorParams,
     messageWarn,
   } from '@utils';
+
+  enum ClusterNodeKeys {
+    PROXY = 'proxy',
+    REDIS_MASTER = 'redis_master',
+    REDIS_SLAVE = 'redis_slave',
+  }
 
   const clusterId = defineModel<number>('clusterId');
 
@@ -273,8 +272,6 @@
   });
 
   const isShowDropdown = ref(false);
-  const showEditEntryConfig = ref(false);
-
   const selected = shallowRef<RedisModel[]>([])
 
   /** 查看密码 */
@@ -462,17 +459,14 @@
                     ]
                   } />
                 )}
-                <auth-button
-                  v-db-console="redis.haClusterManage.modifyEntryConfiguration"
-                  v-bk-tooltips={t('修改入口配置')}
-                  action-id="access_entry_edit"
-                  resource="redis"
-                  permission={data.permission.access_entry_edit}
-                  text
-                  theme="primary"
-                  onClick={() => handleOpenEntryConfig(data)}>
-                  <db-icon type="edit" />
-                </auth-button>
+                <span v-db-console="redis.haClusterManage.modifyEntryConfiguration">
+                  <EditEntryConfig
+                    id={data.id}
+                    getDetailInfo={getRedisDetail}
+                    permission={data.permission.access_entry_edit}
+                    resource={DBTypes.REDIS}
+                    onSuccess={fetchData} />
+                </span>
               </>
             ),
           }}
@@ -632,17 +626,14 @@
                     ]
                   } />
                 )}
-                <auth-button
-                  v-db-console="redis.haClusterManage.modifyEntryConfiguration"
-                  v-bk-tooltips={t('修改入口配置')}
-                  action-id="access_entry_edit"
-                  resource="redis"
-                  permission={data.permission.access_entry_edit}
-                  text
-                  theme="primary"
-                  onClick={() => handleOpenEntryConfig(data)}>
-                  <db-icon type="edit" />
-                </auth-button>
+                <span v-db-console="redis.haClusterManage.modifyEntryConfiguration">
+                  <EditEntryConfig
+                    id={data.id}
+                    getDetailInfo={getRedisDetail}
+                    permission={data.permission.access_entry_edit}
+                    resource={DBTypes.REDIS}
+                    onSuccess={fetchData} />
+                </span>
               </>
             )
           }}
@@ -1133,11 +1124,6 @@
     clusterId.value = id;
   };
 
-  const handleOpenEntryConfig = (row: RedisModel) => {
-    showEditEntryConfig.value = true;
-    clusterId.value = row.id;
-  };
-
   const handleShowPassword = (id: number) => {
     passwordState.isShow = true;
     passwordState.fetchParams.cluster_id = id;
@@ -1319,7 +1305,7 @@
           line-height: unset !important;
 
           .db-icon-copy,
-          .db-icon-edit {
+          .db-icon-visible1 {
             display: none;
             margin-top: 1px;
             margin-left: 4px;
@@ -1386,7 +1372,7 @@
         :deep(th:hover),
         :deep(td:hover) {
           .db-icon-copy,
-          .db-icon-edit {
+          .db-icon-visible1 {
             display: inline-block;
           }
         }

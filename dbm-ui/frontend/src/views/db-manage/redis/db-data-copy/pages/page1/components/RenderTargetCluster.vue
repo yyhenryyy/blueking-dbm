@@ -24,12 +24,6 @@
     </div>
   </BkLoading>
 </template>
-<script lang="ts">
-  export interface SelectItem {
-    value: number;
-    label: string;
-  }
-</script>
 <script setup lang="ts">
   import { useI18n } from 'vue-i18n';
 
@@ -49,7 +43,13 @@
     (e: 'select-change', value: number): void;
   }
 
+  export interface SelectItem {
+    value: number;
+    label: string;
+  }
+
   const props = withDefaults(defineProps<Props>(), {
+    data: undefined,
     selectList: () => [],
     isLoading: false,
   });
@@ -85,7 +85,10 @@
 
   defineExpose<Exposes>({
     getValue() {
-      return selectRef.value.getValue().then(() => localValue.value);
+      return selectRef.value
+        .getValue()
+        .then(() => localValue.value)
+        .catch(() => Promise.reject(localValue.value));
     },
   });
 </script>

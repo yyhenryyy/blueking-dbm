@@ -23,11 +23,12 @@
   import { useI18n } from 'vue-i18n';
   import { useRequest } from 'vue-request';
 
-  import { getSpiderListByBizId } from '@services/source/spider';
-  import type { SpiderTruncateDatabaseDetails, TicketDetails } from '@services/types/ticket';
+  import type { SpiderTruncateDatabaseDetails } from '@services/model/ticket/details/spider';
+  import TicketModel from '@services/model/ticket/ticket';
+  import { getTendbclusterListByBizId } from '@services/source/tendbcluster';
 
   interface Props {
-    ticketDetails: TicketDetails<SpiderTruncateDatabaseDetails>;
+    ticketDetails: TicketModel<SpiderTruncateDatabaseDetails>;
   }
 
   interface RowData {
@@ -86,7 +87,7 @@
     drop_database: t('删除整库_dropdatabase'),
   };
 
-  const { loading } = useRequest(getSpiderListByBizId, {
+  const { loading } = useRequest(getTendbclusterListByBizId, {
     defaultParams: [
       {
         bk_biz_id: props.ticketDetails.bk_biz_id,

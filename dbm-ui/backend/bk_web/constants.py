@@ -18,6 +18,7 @@ LEN_SHORT = 32
 LEN_NORMAL = 64
 LEN_MIDDLE = 128
 LEN_LONG = 255
+LEN_L_LONG = 512
 LEN_X_LONG = 1000
 LEN_XX_LONG = 10000
 
@@ -74,6 +75,9 @@ NON_EXTERNAL_PROXY_ROUTING = [
     "/apis/conf/function_controller/",
     # 环境变量
     "/apis/conf/system_settings/environ/",
+    # django
+    "/swagger/",
+    "/admin/",
 ]
 
 # 外部请求允许的白名单单据类型

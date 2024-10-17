@@ -37,7 +37,8 @@
               "cluster_domain",
               "instance",
               "instance_role",
-              "appid"
+              "appid",
+              "bk_target_service_instance_id"
             ],
             "agg_condition": [],
             "metric_field": "mssql_serveice_available",
@@ -235,7 +236,8 @@
     },
     "labels": [
       "DBM",
-      "DBM_SQLSERVER"
+      "DBM_SQLSERVER",
+      "NEED_AUTOFIX/SQLSERVER_MODIFY_STATUS"
     ],
     "app": "",
     "path": "",
@@ -248,7 +250,7 @@
   },
   "is_enabled": true,
   "monitor_indicator": "MAX(mssql_serveice_available)",
-  "version": 1,
+  "version": 2,
   "alert_source": "time_series",
   "custom_conditions": [],
   "export_at": "2024-04-02T16:01:58+08:00"

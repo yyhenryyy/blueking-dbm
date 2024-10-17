@@ -123,11 +123,11 @@
     T extends
       | RedisModel
       | TendbhaModel
-      | SpiderModel
+      | TendbclusterModel
       | TendbsingleModel
       | MongodbModel
-      | SqlServerHaClusterModel
-      | SqlServerSingleClusterModel
+      | SqlServerHaModel
+      | SqlServerSingleModel
   ">
   import _ from 'lodash';
   import { useI18n } from 'vue-i18n';
@@ -136,14 +136,14 @@
   import TendbhaModel from '@services/model/mysql/tendbha';
   import TendbsingleModel from '@services/model/mysql/tendbsingle';
   import RedisModel from '@services/model/redis/redis';
-  import SpiderModel from '@services/model/spider/tendbCluster';
-  import SqlServerHaClusterModel from '@services/model/sqlserver/sqlserver-ha-cluster';
-  import SqlServerSingleClusterModel from '@services/model/sqlserver/sqlserver-single-cluster';
+  import SqlServerHaModel from '@services/model/sqlserver/sqlserver-ha';
+  import SqlServerSingleModel from '@services/model/sqlserver/sqlserver-single';
+  import TendbclusterModel from '@services/model/tendbcluster/tendbcluster';
   import { getMongoList } from '@services/source/mongodb';
   import { getRedisList } from '@services/source/redis';
-  import { getSpiderList } from '@services/source/spider';
   import { getHaClusterList } from '@services/source/sqlserveHaCluster';
   import { getSingleClusterList } from '@services/source/sqlserverSingleCluster';
+  import { getTendbClusterList } from '@services/source/tendbcluster';
   import { getTendbhaList, getTendbhaSalveList } from '@services/source/tendbha';
   import { getTendbsingleList } from '@services/source/tendbsingle';
   import type { ListBase } from '@services/types';
@@ -172,7 +172,7 @@
     // 不可选行及提示
     disabledRowConfig?: {
       handler: (data: any) => boolean;
-      tip?: string;
+      tip: string;
     }[];
     // 自定义列
     customColums?: any[];
@@ -200,6 +200,7 @@
     clusterTypes: string[];
     tabListConfig?: Record<string, TabConfig>;
     onlyOneType?: boolean;
+    supportOfflineData?: boolean;
   }
 
   interface Emits {
@@ -229,7 +230,21 @@
         },
       ],
       multiple: true,
-      getResourceList: getSpiderList,
+      getResourceList: getTendbClusterList,
+      tableContent: SpiderTable,
+      resultContent: ResultPreview,
+    },
+    tendbclusterSlave: {
+      id: 'tendbclusterSlave',
+      name: t('集群选择'),
+      disabledRowConfig: [
+        {
+          handler: (data: T) => data.isOffline,
+          tip: t('集群已禁用'),
+        },
+      ],
+      multiple: true,
+      getResourceList: getTendbClusterList,
       tableContent: SpiderTable,
       resultContent: ResultPreview,
     },
@@ -360,7 +375,14 @@
     if (props.tabListConfig) {
       Object.keys(props.tabListConfig).forEach((type) => {
         if (props.tabListConfig?.[type]) {
-          const disabledRowConfigList = tabListMap[type].disabledRowConfig!;
+          const disabledRowConfigList = props.supportOfflineData
+            ? []
+            : [
+                {
+                  handler: (data: T) => data.isOffline,
+                  tip: t('集群已禁用'),
+                },
+              ];
           const disabledRowConfigProp = props.tabListConfig?.[type].disabledRowConfig;
           if (disabledRowConfigProp) {
             // 外部设置了 disabledRowConfig, 需要追加到 disabledRowConfig列表

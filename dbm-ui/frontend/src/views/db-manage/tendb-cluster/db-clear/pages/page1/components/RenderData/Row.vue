@@ -60,7 +60,9 @@
     </td>
     <OperateColumn
       :removeable="removeable"
+      show-clone
       @add="handleAppend"
+      @clone="handleClone"
       @remove="handleRemove" />
   </tr>
 </template>
@@ -81,6 +83,8 @@
     ignoreDbs?: string[];
     ignoreTables?: string[];
   }
+
+  export type IDataRowBatchKey = keyof Omit<IDataRow, 'rowKey' | 'clusterData'>;
 
   // 创建表格数据
   export const createRowData = (data = {} as Partial<IDataRow>): IDataRow => ({
@@ -107,6 +111,7 @@
   interface Emits {
     (e: 'add', params: Array<IDataRow>): void;
     (e: 'remove'): void;
+    (e: 'clone', value: IDataRow): void;
   }
 
   interface Exposes {
@@ -136,13 +141,19 @@
       if (props.data.clusterData) {
         localClusterId.value = props.data.clusterData.id;
       }
-      tablePatterns.value = props.data.tablePatterns ?? [];
-      ignoreTables.value = props.data.ignoreTables ?? [];
     },
     {
       immediate: true,
     },
   );
+
+  watchEffect(() => {
+    tablePatterns.value = props.data.tablePatterns ?? [];
+  });
+
+  watchEffect(() => {
+    ignoreTables.value = props.data.ignoreTables ?? [];
+  });
 
   const handleClusterIdChange = (clusterId: number) => {
     localClusterId.value = clusterId;
@@ -188,16 +199,39 @@
     emits('remove');
   };
 
+  const getRowData = () => [
+    clusterRef.value.getValue(),
+    truncateDataTypeRef.value.getValue(),
+    dbPatternsRef.value.getValue('db_patterns'),
+    tablePatternsRef.value.getValue('table_patterns'),
+    ignoreDbsRef.value.getValue('ignore_dbs'),
+    ignoreTablesRef.value.getValue('ignore_tables'),
+  ];
+
+  const handleClone = () => {
+    Promise.allSettled(getRowData()).then((rowData) => {
+      const [clusterData, truncateDataTypeData, dbPatternsData, tablePatternsData, ignoreDbsData, ignoreTablesData] =
+        rowData.map((item) => (item.status === 'fulfilled' ? item.value : item.reason));
+      emits(
+        'clone',
+        createRowData({
+          clusterData: {
+            id: clusterData.cluster_id,
+            domain: '',
+          },
+          truncateDataType: truncateDataTypeData.truncate_data_type,
+          dbPatterns: dbPatternsData.db_patterns,
+          tablePatterns: tablePatternsData.table_patterns,
+          ignoreDbs: ignoreDbsData.ignore_dbs,
+          ignoreTables: ignoreTablesData.ignore_tables,
+        }),
+      );
+    });
+  };
+
   defineExpose<Exposes>({
     getValue() {
-      return Promise.all([
-        clusterRef.value.getValue(),
-        truncateDataTypeRef.value.getValue(),
-        dbPatternsRef.value.getValue('db_patterns'),
-        tablePatternsRef.value.getValue('table_patterns'),
-        ignoreDbsRef.value.getValue('ignore_dbs'),
-        ignoreTablesRef.value.getValue('ignore_tables'),
-      ]).then(
+      return Promise.all(getRowData()).then(
         ([clusterData, truncateDataTypeData, dbPatternsData, tablePatternsData, ignoreDbsData, ignoreTablesData]) => ({
           ...clusterData,
           ...truncateDataTypeData,

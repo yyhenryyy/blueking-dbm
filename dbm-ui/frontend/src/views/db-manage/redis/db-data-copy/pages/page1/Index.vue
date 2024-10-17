@@ -114,6 +114,7 @@
           </BkSelect>
         </template>
       </template>
+      <TicketRemark v-model="remark" />
     </div>
     <template #action>
       <BkButton
@@ -180,13 +181,14 @@
   import type { RedisClusterType as ClusterType } from '@services/model/ticket/details/redis';
   import { getRedisList } from '@services/source/redis';
   import { createTicket } from '@services/source/ticket';
-  import type { SubmitTicket } from '@services/types/ticket';
 
   import { useTicketCloneInfo } from '@hooks';
 
   import { useGlobalBizs } from '@stores';
 
   import { LocalStorageKeys, TicketTypes } from '@common/const';
+
+  import TicketRemark from '@components/ticket-remark/Index.vue';
 
   import {
     copyTypeList,
@@ -205,22 +207,6 @@
 
   type InfoTypes = InfoItem | CrossBusinessInfoItem | IntraBusinessToThirdInfoItem | SelfbuiltClusterToIntraInfoItem;
 
-  // 提交单据类型
-  type DataCopySubmitTicket = SubmitTicket<TicketTypes, InfoTypes[]> & {
-    details: {
-      dts_copy_type: CopyModes;
-      write_mode: WriteModes;
-      sync_disconnect_setting: {
-        type: DisconnectModes;
-        reminder_frequency: RemindFrequencyModes | '';
-      };
-      data_check_repair_setting: {
-        type: RepairAndVerifyModes | '';
-        execution_frequency: RepairAndVerifyFrequencyModes | '';
-      };
-    };
-  };
-
   const router = useRouter();
   const { t } = useI18n();
   const { currentBizId } = useGlobalBizs();
@@ -235,6 +221,7 @@
       writeType.value = writeMode;
       disconnectType.value = disconnectSetting.type;
       remindFrequencyType.value = disconnectSetting.reminder_frequency;
+      remark.value = cloneData.remark;
       window.changeConfirm = true;
     },
   });
@@ -246,6 +233,7 @@
   const remindFrequencyType = ref(RemindFrequencyModes.ONCE_DAILY);
   const repairAndVerifyType = ref(RepairAndVerifyModes.DATA_CHECK_AND_REPAIR);
   const repairAndVerifyFrequency = ref(RepairAndVerifyFrequencyModes.ONCE_AFTER_REPLICATION);
+  const remark = ref('');
   const submitDisable = ref(true);
   const clusterList = ref<SelectItem[]>([]);
   const currentTableRef = ref();
@@ -304,9 +292,10 @@
   // 根据表格数据生成提交单据请求参数
   const generateRequestParam = (infos: InfoTypes[]) => {
     const isAutoDisconnect = disconnectType.value === DisconnectModes.AUTO_DISCONNECT_AFTER_REPLICATION;
-    const params: DataCopySubmitTicket = {
+    const params = {
       bk_biz_id: currentBizId,
       ticket_type: TicketTypes.REDIS_CLUSTER_DATA_COPY,
+      remark: remark.value,
       details: {
         dts_copy_type: copyType.value,
         write_mode: writeType.value,

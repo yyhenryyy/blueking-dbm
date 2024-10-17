@@ -402,7 +402,8 @@ class CrondMonitorKwargs:
 
     bk_cloud_id: int
     exec_ips: list
-    port: int
+    name: str = ""
+    port: int = 0
     minutes: int = 1440
     enable: bool = False
 
@@ -473,6 +474,7 @@ class InitCheckForResourceKwargs:
 
     ips: list
     bk_biz_id: int = env.DBA_APP_BK_BIZ_ID
+    account_name: str = "root"
 
 
 @dataclass()

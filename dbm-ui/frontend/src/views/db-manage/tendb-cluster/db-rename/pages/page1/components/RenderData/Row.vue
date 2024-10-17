@@ -40,7 +40,9 @@
     </td>
     <OperateColumn
       :removeable="removeable"
+      show-clone
       @add="handleAppend"
+      @clone="handleClone"
       @remove="handleRemove" />
   </tr>
 </template>
@@ -58,6 +60,8 @@
     fromDatabase?: string;
     toDatabase?: string;
   }
+
+  export type IDataRowBatchKey = keyof Omit<IDataRow, 'rowKey' | 'clusterData'>;
 
   // 创建表格数据
   export const createRowData = (data = {} as Partial<IDataRow>): IDataRow => ({
@@ -81,6 +85,7 @@
     (e: 'add', params: IDataRow): void;
     (e: 'remove'): void;
     (e: 'clusterInputFinish', value: string): void;
+    (e: 'clone', value: IDataRow): void;
   }
 
   interface Exposes {
@@ -129,16 +134,37 @@
     emits('remove');
   };
 
+  const getRowData = () => [
+    clusterRef.value.getValue(),
+    fromDatabaseRef.value.getValue('from_database'),
+    toDatabaseRef.value.getValue('to_database'),
+  ];
+
+  const handleClone = () => {
+    Promise.allSettled(getRowData()).then((rowData) => {
+      const [clusterData, fromDatabaseData, toDatabaseData] = rowData.map((item) =>
+        item.status === 'fulfilled' ? item.value : item.reason,
+      );
+      emits(
+        'clone',
+        createRowData({
+          clusterData: {
+            id: clusterData.cluster_id,
+            domain: '',
+          },
+          fromDatabase: fromDatabaseData.from_database,
+          toDatabase: toDatabaseData.to_database,
+        }),
+      );
+    });
+  };
+
   defineExpose<Exposes>({
     getValue() {
-      return Promise.all([
-        clusterRef.value.getValue(),
-        fromDatabaseRef.value.getValue('from_database'),
-        toDatabaseRef.value.getValue('to_database'),
-      ]).then(([clusterData, backupLocalData, dbPatternsData]) => ({
+      return Promise.all(getRowData()).then(([clusterData, fromDatabaseData, toDatabaseData]) => ({
         ...clusterData,
-        ...backupLocalData,
-        ...dbPatternsData,
+        ...fromDatabaseData,
+        ...toDatabaseData,
       }));
     },
   });

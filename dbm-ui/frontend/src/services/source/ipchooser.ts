@@ -11,14 +11,9 @@
  * the specific language governing permissions and limitations under the License.
  */
 
-import http from '../http';
-import type { HostDetails } from '../types';
+import type { HostInfo } from '@services/types';
 
-interface IpScope {
-  scope_id: number;
-  scope_type: string;
-  bk_cloud_id?: number | string;
-}
+import http from '../http';
 
 const path = '/apis/ipchooser';
 
@@ -30,9 +25,13 @@ export function checkHost(params: {
   mode?: string;
   ipv6_list?: string[];
   key_list?: string[];
-  scope_list?: IpScope[];
+  scope_list?: {
+    scope_id: number;
+    scope_type: string;
+    bk_cloud_id?: number | string;
+  }[];
 }) {
-  return http.post<HostDetails[]>(`${path}/host/check/`, params);
+  return http.post<HostInfo[]>(`${path}/host/check/`, params);
 }
 
 /**
@@ -40,10 +39,20 @@ export function checkHost(params: {
  */
 export function getHostDetails(params: {
   mode?: string;
-  host_list: Array<Partial<HostDetails>>;
-  scope_list: IpScope[];
+  host_list: {
+    host_id: number;
+    meta?: {
+      bk_biz_id: number;
+      scope_id: string;
+      scope_type: string;
+    };
+  }[];
+  scope_list: {
+    scope_id: string;
+    scope_type: string;
+  }[];
 }) {
-  return http.post<HostDetails[]>(`${path}/host/details/`, params);
+  return http.post<HostInfo[]>(`${path}/host/details/`, params);
 }
 
 /**
@@ -61,36 +70,48 @@ export function updateIpSelectorSettings(params: any) {
 }
 
 /**
- * 获取主机信息参数
+ * 根据多个拓扑节点与搜索条件批量分页查询所包含的主机 ID 信息
  */
-interface FetchHostInfosParams {
+export function getHostIdInfos(params: {
   node_list: Array<{
     instance_id: number;
     object_id: string;
-    meta: HostDetails['meta'];
+    meta: HostInfo['meta'];
   }>;
   page_size: number;
   start: number;
   mode?: string;
-}
-
-/**
- * 根据多个拓扑节点与搜索条件批量分页查询所包含的主机 ID 信息
- */
-export function getHostIdInfos(params: FetchHostInfosParams) {
+}) {
   return http.post(`${path}/topo/query_host_id_infos/`, params);
 }
 /**
  * 根据多个拓扑节点与搜索条件批量分页查询所包含的主机信息
  */
-export function getHosts(params: FetchHostInfosParams) {
+export function getHosts(params: {
+  node_list: Array<{
+    instance_id: number;
+    object_id: string;
+    meta: HostInfo['meta'];
+  }>;
+  page_size: number;
+  start: number;
+  mode?: string;
+}) {
   return http.post(`${path}/topo/query_hosts/`, params);
 }
 
 /**
  * 批量获取含各节点主机数量的拓扑树
  */
-export function getHostTopo(params: { mode?: string; all_scope: boolean; scope_list: IpScope[] }) {
+export function getHostTopo(params: {
+  mode?: string;
+  all_scope: boolean;
+  scope_list: {
+    scope_id: number;
+    scope_type: string;
+    bk_cloud_id?: number | string;
+  }[];
+}) {
   return http.post(`${path}/topo/trees/`, params);
 }
 
@@ -117,30 +138,27 @@ export function getHostTopoInfos(params: {
 }
 
 /**
- * 管控区域基本信息
- */
-interface CloudAreaInfo {
-  bk_account_id: number;
-  bk_cloud_id: number;
-  bk_cloud_name: string;
-  bk_cloud_vendor: string;
-  bk_creator: string;
-  bk_last_editor: string;
-  bk_region: string;
-  bk_status: string;
-  bk_status_detail: string;
-  bk_supplier_account: string;
-  bk_vpc_id: string;
-  bk_vpc_name: string;
-  create_time: string;
-  last_time: string;
-}
-
-/**
  * 获取管控区域列表
  */
 export function getCloudList() {
-  return http.post<CloudAreaInfo[]>(`${path}/settings/search_cloud_area/`);
+  return http.post<
+    {
+      bk_account_id: number;
+      bk_cloud_id: number;
+      bk_cloud_name: string;
+      bk_cloud_vendor: string;
+      bk_creator: string;
+      bk_last_editor: string;
+      bk_region: string;
+      bk_status: string;
+      bk_status_detail: string;
+      bk_supplier_account: string;
+      bk_vpc_id: string;
+      bk_vpc_name: string;
+      create_time: string;
+      last_time: string;
+    }[]
+  >(`${path}/settings/search_cloud_area/`);
 }
 
 /**

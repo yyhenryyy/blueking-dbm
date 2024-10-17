@@ -20,6 +20,7 @@
         :title="t('DB 重命名：database 重命名')" />
       <RenderData
         class="mt16"
+        @batch-edit="handleBatchEditColumn"
         @batch-select-cluster="handleShowBatchSelector">
         <RenderDataRow
           v-for="(item, index) in tableData"
@@ -28,6 +29,7 @@
           :data="item"
           :removeable="tableData.length < 2"
           @add="(payload: IDataRow) => handleAppend(index, payload)"
+          @clone="(payload: IDataRow) => handleClone(index, payload)"
           @cluster-input-finish="(domain: string) => handleChangeCluster(index, domain)"
           @remove="handleRemove(index)" />
       </RenderData>
@@ -44,6 +46,7 @@
           {{ t('忽略业务连接') }}
         </span>
       </div>
+      <TicketRemark v-model="formData.remark" />
       <ClusterSelector
         v-model:is-show="isShowBatchSelector"
         :cluster-types="[ClusterTypes.TENDBCLUSTER]"
@@ -76,22 +79,41 @@
   import { useI18n } from 'vue-i18n';
   import { useRouter } from 'vue-router';
 
-  import SpiderModel from '@services/model/spider/spider';
-  import { getSpiderList } from '@services/source/spider';
+  import TendbClusterModel from '@services/model/tendbcluster/tendbcluster';
+  import { getTendbClusterList } from '@services/source/tendbcluster';
   import { createTicket } from '@services/source/ticket';
+
+  import { useTicketCloneInfo } from '@hooks';
 
   import { useGlobalBizs } from '@stores';
 
   import { ClusterTypes, TicketTypes } from '@common/const';
 
   import ClusterSelector from '@components/cluster-selector/Index.vue';
+  import TicketRemark from '@components/ticket-remark/Index.vue';
 
   import RenderData from './components/RenderData/Index.vue';
-  import RenderDataRow, { createRowData, type IDataRow } from './components/RenderData/Row.vue';
+  import RenderDataRow, { createRowData, type IDataRow, type IDataRowBatchKey } from './components/RenderData/Row.vue';
+
+  const createDefaultData = () => ({
+    remark: '',
+  });
 
   const { t } = useI18n();
   const router = useRouter();
   const { currentBizId } = useGlobalBizs();
+
+  // 单据克隆
+  useTicketCloneInfo({
+    type: TicketTypes.TENDBCLUSTER_RENAME_DATABASE,
+    onSuccess(cloneData) {
+      const { tableDataList, force, remark } = cloneData;
+      tableData.value = tableDataList;
+      isIgnore.value = force;
+      formData.remark = remark;
+      window.changeConfirm = true;
+    },
+  });
 
   const rowRefs = ref();
   const isShowBatchSelector = ref(false);
@@ -99,7 +121,9 @@
   const isIgnore = ref(false);
   const tableData = ref<Array<IDataRow>>([createRowData({})]);
 
-  const selectedClusters = shallowRef<{ [key: string]: Array<SpiderModel> }>({ [ClusterTypes.TENDBCLUSTER]: [] });
+  const formData = reactive(createDefaultData());
+
+  const selectedClusters = shallowRef<{ [key: string]: Array<TendbClusterModel> }>({ [ClusterTypes.TENDBCLUSTER]: [] });
 
   // 集群域名是否已存在表格的映射表
   let domainMemo: Record<string, boolean> = {};
@@ -119,7 +143,7 @@
   };
 
   // 批量选择
-  const handelClusterChange = (selected: { [key: string]: Array<SpiderModel> }) => {
+  const handelClusterChange = (selected: { [key: string]: Array<TendbClusterModel> }) => {
     selectedClusters.value = selected;
     const list = selected[ClusterTypes.TENDBCLUSTER];
     const newList = list.reduce((result, item) => {
@@ -144,6 +168,17 @@
     window.changeConfirm = true;
   };
 
+  const handleBatchEditColumn = (value: string, filed: IDataRowBatchKey) => {
+    if (!value || checkListEmpty(tableData.value)) {
+      return;
+    }
+    tableData.value.forEach((row) => {
+      Object.assign(row, {
+        [filed]: value,
+      });
+    });
+  };
+
   // 追加一个集群
   const handleAppend = (index: number, rowData: IDataRow) => {
     const dataList = [...tableData.value];
@@ -157,7 +192,7 @@
       return;
     }
 
-    const resultList = await getSpiderList({ exact_domain: domain });
+    const resultList = await getTendbClusterList({ exact_domain: domain });
     if (resultList.results.length < 1) {
       return;
     }
@@ -187,13 +222,32 @@
     }
   };
 
+  // 复制行数据
+  const handleClone = (index: number, sourceData: IDataRow) => {
+    const dataList = [...tableData.value];
+    dataList.splice(
+      index + 1,
+      0,
+      Object.assign(sourceData, {
+        clusterData: {
+          ...sourceData.clusterData,
+          domain: tableData.value[index].clusterData?.domain ?? '',
+        },
+      }),
+    );
+    tableData.value = dataList;
+    setTimeout(() => {
+      rowRefs.value[rowRefs.value.length - 1].getValue();
+    });
+  };
+
   const handleSubmit = async () => {
     try {
       isSubmitting.value = true;
       const infos = await Promise.all(rowRefs.value.map((item: { getValue: () => Promise<any> }) => item.getValue()));
       await createTicket({
         ticket_type: TicketTypes.TENDBCLUSTER_RENAME_DATABASE,
-        remark: '',
+        remark: formData.remark,
         details: {
           force: isIgnore.value,
           infos,
@@ -217,6 +271,7 @@
   };
 
   const handleReset = () => {
+    Object.assign(formData, createDefaultData());
     tableData.value = [createRowData()];
     selectedClusters.value[ClusterTypes.TENDBCLUSTER] = [];
     domainMemo = {};

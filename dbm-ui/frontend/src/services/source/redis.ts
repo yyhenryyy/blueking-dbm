@@ -13,43 +13,12 @@
 
 import BizConfTopoTreeModel from '@services/model/config/biz-conf-topo-tree';
 import RedisModel from '@services/model/redis/redis';
+import RedisDetailModel from '@services/model/redis/redis-detail';
 import RedisInstanceModel from '@services/model/redis/redis-instance';
 import RedisMachineModel from '@services/model/redis/redis-machine';
+import type { HostNode, ListBase, ResourceTopo } from '@services/types';
 
 import http from '../http';
-import type { HostNode, ListBase, ResourceTopo } from '../types';
-import type { ResourceRedisItem } from '../types/clusters';
-
-interface InstanceDetails {
-  bk_cloud_id: number;
-  bk_cpu: number;
-  bk_disk: number;
-  bk_host_id: number;
-  bk_host_innerip: string;
-  bk_mem: number;
-  bk_os_name: string;
-  bk_idc_name: string;
-  bk_cloud_name: string;
-  cluster_id: number;
-  cluster_type: string;
-  cluster_type_display: string;
-  create_at: string;
-  db_version: string;
-  db_module_id: number;
-  idc_city_id: string;
-  idc_city_name: string;
-  idc_id: number;
-  instance_address: string;
-  master_domain: string;
-  net_device_id: string;
-  rack: string;
-  rack_id: number;
-  role: string;
-  slave_domain: string;
-  status: string;
-  sub_zone: string;
-  version?: string;
-}
 
 const getRootPath = () => `/apis/redis/bizs/${window.PROJECT_CONFIG.BIZ_ID}/redis_resources`;
 
@@ -142,14 +111,16 @@ export function retrieveRedisInstance(params: {
   instance_address: string;
   cluster_id?: number;
 }) {
-  return http.get<InstanceDetails>(`${getRootPath()}/retrieve_instance/`, params);
+  return http
+    .get<RedisInstanceModel>(`${getRootPath()}/retrieve_instance/`, params)
+    .then((data) => new RedisInstanceModel(data));
 }
 
 /**
  * 获取集群详情
  */
 export function getRedisDetail(params: { id: number }) {
-  return http.get<ResourceRedisItem>(`${getRootPath()}/${params.id}/`);
+  return http.get<RedisDetailModel>(`${getRootPath()}/${params.id}/`).then((data) => new RedisDetailModel(data));
 }
 
 /**

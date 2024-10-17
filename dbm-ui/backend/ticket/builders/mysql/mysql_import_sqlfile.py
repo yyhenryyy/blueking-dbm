@@ -16,7 +16,8 @@ from rest_framework import serializers
 
 from backend import env
 from backend.components.sql_import.client import SQLSimulationApi
-from backend.configuration.constants import DBType
+from backend.configuration.constants import BizSettingsEnum, DBType
+from backend.configuration.models import BizSettings
 from backend.db_services.mysql.sql_import.constants import SQLExecuteTicketMode
 from backend.db_services.mysql.sql_import.handlers import SQLHandler
 from backend.flow.engine.bamboo.engine import BambooEngine
@@ -113,6 +114,10 @@ class MysqlSqlImportFlowBuilder(BaseMySQLTicketFlowBuilder):
 
     @property
     def need_itsm(self):
+        # 业务强制需要审批流
+        force_need_itsm = BizSettings.get_setting_value(self.ticket.bk_biz_id, BizSettingsEnum.SQL_IMPORT_FORCE_ITSM)
+        if force_need_itsm:
+            return True
         # 非高危的SQL变更单据，不需要审批节点
         grammar_check_info = self.ticket.details["grammar_check_info"].values()
         high_risk = [check["highrisk_warnings"] for check in grammar_check_info if check["highrisk_warnings"]]
@@ -144,6 +149,8 @@ class MysqlSqlImportFlowBuilder(BaseMySQLTicketFlowBuilder):
             [details.pop(field, None) for field in pop_fields]
 
         ticket.details.update(details)
+        # 补充备注信息
+        ticket.remark = ticket.remark or details.get("remark", _("由模拟执行任务[{}]发起").format(root_id))
 
     @classmethod
     def patch_sqlfile_grammar_check_info(cls, ticket, cluster_type):
@@ -225,5 +232,6 @@ class MysqlSqlImportFlowBuilder(BaseMySQLTicketFlowBuilder):
 
     @classmethod
     def describe_ticket_flows(cls, flow_config_map):
-        flow_desc = [_("SQL模拟执行状态查询"), _("单据审批"), _("库表备份(可选)"), _("变更SQL执行")]
+        flow_desc = cls._add_itsm_pause_describe(flow_desc=[], flow_config_map=flow_config_map)
+        flow_desc = [_("SQL模拟执行状态查询")] + flow_desc + [_("库表备份(可选)"), _("变更SQL执行")]
         return flow_desc

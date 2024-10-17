@@ -35,11 +35,12 @@
   import { useI18n } from 'vue-i18n';
   import { useRequest } from 'vue-request';
 
-  import { getSpiderListByBizId } from '@services/source/spider';
-  import type { SpiderFullBackupDetails, TicketDetails } from '@services/types/ticket';
+  import type { SpiderFullBackupDetails } from '@services/model/ticket/details/spider';
+  import TicketModel from '@services/model/ticket/ticket';
+  import { getTendbclusterListByBizId } from '@services/source/tendbcluster';
 
   interface Props {
-    ticketDetails: TicketDetails<SpiderFullBackupDetails>;
+    ticketDetails: TicketModel<SpiderFullBackupDetails>;
   }
 
   interface RowData {
@@ -88,7 +89,7 @@
     return fileTagMap[fileTag];
   });
 
-  useRequest(getSpiderListByBizId, {
+  useRequest(getTendbclusterListByBizId, {
     defaultParams: [
       {
         bk_biz_id: props.ticketDetails.bk_biz_id,

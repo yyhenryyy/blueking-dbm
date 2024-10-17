@@ -50,6 +50,7 @@ class SqlserverDBMeta(object):
             bk_cloud_id=int(self.global_data["bk_cloud_id"]),
             resource_spec=self.global_data.get("resource_spec", def_resource_spec),
             region=self.global_data["region"],
+            is_increment=self.global_data.get("is_increment", False),
         )
         return True
 
@@ -72,6 +73,7 @@ class SqlserverDBMeta(object):
             region=self.global_data["region"],
             sync_type=self.global_data["sync_type"],
             disaster_tolerance_level=self.global_data["disaster_tolerance_level"],
+            is_increment=self.global_data.get("is_increment", False),
         )
         return True
 
@@ -197,3 +199,12 @@ class SqlserverDBMeta(object):
             )
         # 任务结束后变更状态
         SqlserverDtsInfo.objects.filter(id=self.global_data["dts_id"]).update(status=status)
+
+    def modify_status_for_not_joined_dbha(self):
+        """
+        对未接入DBHA的主从集群，如果实例出现故障主动修改实例的状态
+        """
+        SqlserverHAClusterHandler.modify_status(
+            cluster_id=int(self.global_data["cluster_id"]),
+            ip_list=self.global_data["ip_list"],
+        )

@@ -49,6 +49,7 @@ class SqlserverHAClusterHandler(ClusterHandler):
         region: str,
         sync_type: str,
         disaster_tolerance_level: str,
+        is_increment: bool = False,
     ):
         """
         1: 录入机器信息
@@ -121,7 +122,9 @@ class SqlserverHAClusterHandler(ClusterHandler):
             )
 
         # 主机转移模块、添加对应的服务实例
-        SqlserverCCTopoOperator(new_clusters).transfer_instances_to_cluster_module(storage_objs)
+        SqlserverCCTopoOperator(new_clusters).transfer_instances_to_cluster_module(
+            instances=storage_objs, is_increment=is_increment
+        )
 
     @transaction.atomic
     def decommission(self):
@@ -305,8 +308,8 @@ class SqlserverHAClusterHandler(ClusterHandler):
             )[0]
             new_slave_obj.db_module_id = cluster.db_module_id
             new_slave_obj.machine.db_module_id = cluster.db_module_id
-            new_slave_obj.save(update_fields=["db_module_id"])
-            new_slave_obj.machine.save(update_fields=["db_module_id"])
+            new_slave_obj.save()
+            new_slave_obj.machine.save()
             cluster.storageinstance_set.add(new_slave_obj)
 
             # 切换slave域名信息
@@ -422,3 +425,18 @@ class SqlserverHAClusterHandler(ClusterHandler):
         return StorageInstance.objects.get(
             cluster=self.cluster, instance_inner_role=InstanceInnerRole.MASTER.value
         ).ip_port
+
+    @classmethod
+    @transaction.atomic
+    def modify_status(
+        cls,
+        cluster_id: int,
+        ip_list: list,
+    ):
+        cluster = Cluster.objects.get(id=cluster_id)
+        if cluster.is_dbha_disabled() or cluster.cluster_type == ClusterType.SqlserverSingle:
+            # 对未接入dbha的主从集群做处理
+            # 获取对单节点集群做处理
+            StorageInstance.objects.filter(cluster=cluster, machine__ip__in=ip_list).update(
+                status=InstanceStatus.UNAVAILABLE
+            )

@@ -132,7 +132,7 @@
   import { useI18n } from 'vue-i18n';
 
   import { checkHost, getHostTopoInfos } from '@services/source/ipchooser';
-  import type { HostDetails } from '@services/types/ip';
+  import type { HostInfo } from '@services/types/ip';
 
   import { useGlobalBizs } from '@stores';
 
@@ -151,6 +151,7 @@
 
   interface Props {
     clusterData: IDataRow['clusterData'];
+    newHostList: IDataRow['newHostList'];
   }
 
   interface Exposes {
@@ -164,7 +165,7 @@
     >;
   }
 
-  defineProps<Props>();
+  const props = defineProps<Props>();
 
   const genHostKey = (hostData: HostTopoInfo) => `#${hostData.bk_cloud_id}#${hostData.ip}`;
 
@@ -188,7 +189,7 @@
 
   const conflicHostMap = shallowRef<Record<string, Array<HostTopoInfo>>>({});
   const conflicHostSelectMap = shallowRef<Record<string, HostTopoInfo>>({});
-  const localHostList = shallowRef<HostDetails[]>([]);
+  const localHostList = shallowRef<HostInfo[]>([]);
 
   let masterHost = {} as HostTopoInfo;
   let slaveHost = {} as HostTopoInfo;
@@ -220,7 +221,7 @@
             bk_host_innerip: [masterIp, slaveIp],
           },
           bk_biz_id: currentBizId,
-        }).then((data) => {
+        }).then(async (data) => {
           // 一个 IP 存在于多个管控区域
           if (data.hosts_topo_info.length > 2) {
             isConflict.value = true;
@@ -249,21 +250,20 @@
                 slaveHost = item;
                 singleHostSelectMemo[instanceKey][genHostKey(slaveHost)] = true;
               }
-              if (!_.isEmpty(masterHost) && !_.isEmpty(slaveHost)) {
-                checkHost({
-                  ip_list: [masterHost.ip, slaveHost.ip],
-                  scope_list: [
-                    {
-                      scope_id: currentBizId,
-                      scope_type: 'biz',
-                    },
-                  ],
-                  mode: 'all',
-                }).then((hostList) => {
-                  localHostList.value = hostList;
-                });
-              }
             });
+            if (!_.isEmpty(masterHost) && !_.isEmpty(slaveHost)) {
+              const hostList = await checkHost({
+                ip_list: [masterHost.ip, slaveHost.ip],
+                scope_list: [
+                  {
+                    scope_id: currentBizId,
+                    scope_type: 'biz',
+                  },
+                ],
+                mode: 'all',
+              });
+              localHostList.value = hostList;
+            }
             return true;
           }
           return false;
@@ -300,6 +300,16 @@
     return _.trim(fisrt) === _.trim(last);
   });
 
+  watch(
+    () => props.newHostList,
+    () => {
+      localValue.value = props.newHostList.join(',');
+    },
+    {
+      immediate: true,
+    },
+  );
+
   watch(isConflict, () => {
     nextTick(() => {
       if (isConflict.value) {
@@ -334,12 +344,11 @@
     isShowIpSelector.value = true;
   };
 
-  const disableDialogSubmitMethod = (hostList: HostDetails[]) => (hostList.length === 2 ? false : t('需n台', { n: 2 }));
+  const disableDialogSubmitMethod = (hostList: HostInfo[]) => (hostList.length === 2 ? false : t('需n台', { n: 2 }));
 
-  const disableHostMethod = (data: HostDetails, list: HostDetails[]) =>
-    list.length >= 2 ? t('仅需n台', { n: 2 }) : false;
+  const disableHostMethod = (data: HostInfo, list: HostInfo[]) => (list.length >= 2 ? t('仅需n台', { n: 2 }) : false);
 
-  const handleHostChange = (hostList: HostDetails[]) => {
+  const handleHostChange = (hostList: HostInfo[]) => {
     localHostList.value = hostList;
     localValue.value = hostList.map((hostItem) => hostItem.ip).join(',');
   };
@@ -366,16 +375,16 @@
 
   defineExpose<Exposes>({
     getValue() {
-      return inputRef.value!.getValue().then(() =>
-        Promise.resolve(
-          localHostList.value.map((hostItem) => ({
-            ip: hostItem.ip,
-            bk_cloud_id: hostItem.cloud_id,
-            bk_host_id: hostItem.host_id,
-            bk_biz_id: hostItem.biz.id,
-          })),
-        ),
-      );
+      const hostList = localHostList.value.map((hostItem) => ({
+        ip: hostItem.ip,
+        bk_cloud_id: hostItem.cloud_id,
+        bk_host_id: hostItem.host_id,
+        bk_biz_id: hostItem.biz.id,
+      }));
+      return inputRef
+        .value!.getValue()
+        .then(() => Promise.resolve(hostList))
+        .catch(() => Promise.reject(hostList));
     },
   });
 </script>

@@ -59,17 +59,17 @@
   import { useI18n } from 'vue-i18n';
   import { useRequest } from 'vue-request';
 
+  import TendbsingleModel from '@services/model/mysql/tendbsingle';
   import { getMonitorUrls } from '@services/source/monitorGrafana';
   import { getTendbsingleDetail } from '@services/source/tendbsingle';
-  import type { ResourceItem } from '@services/types';
 
   import { useGlobalBizs } from '@stores';
 
   import { ClusterTypes, DBTypes } from '@common/const';
 
-  import ClusterTopo from '@components/cluster-details/ClusterTopo.vue';
-  import ClusterEventChange from '@components/cluster-event-change/EventChange.vue';
-  import MonitorDashboard from '@components/cluster-monitor/MonitorDashboard.vue';
+  import ClusterTopo from '@views/db-manage/common/cluster-details/ClusterTopo.vue';
+  import ClusterEventChange from '@views/db-manage/common/cluster-event-change/EventChange.vue';
+  import MonitorDashboard from '@views/db-manage/common/cluster-monitor/MonitorDashboard.vue';
 
   import { checkDbConsole } from '@utils';
 
@@ -91,7 +91,7 @@
   const { currentBizId } = useGlobalBizs();
 
   const activePanelKey = ref('topo');
-  const data = ref<ResourceItem>();
+  const data = ref<TendbsingleModel>();
   const monitorPanelList = ref<PanelItem[]>([]);
 
   const activePanel = computed(() => {
@@ -101,7 +101,7 @@
 
   const { loading: isLoading, run: fetchResourceDetails } = useRequest(getTendbsingleDetail, {
     manual: true,
-    onSuccess(result: ResourceItem) {
+    onSuccess(result: TendbsingleModel) {
       data.value = result;
     },
   });
