@@ -51,7 +51,6 @@ class MongoDBAutofixFlowParamBuilder(builders.FlowParamBuilder):
     def format_ticket_data(self):
         bk_biz_id = self.ticket_data["bk_biz_id"]
         self.ticket_data["bk_app_abbr"] = AppCache.objects.get(bk_biz_id=bk_biz_id).db_app_abbr
-        MongoDBBackupFlowParamBuilder.add_cluster_type_info(self.ticket_data["infos"])
 
 
 class MongoDBAutofixResourceParamBuilder(BaseMongoDBOperateResourceParamBuilder):
