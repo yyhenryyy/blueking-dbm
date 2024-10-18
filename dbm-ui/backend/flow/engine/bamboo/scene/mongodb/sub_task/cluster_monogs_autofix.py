@@ -183,7 +183,7 @@ def mongos_autofix(root_id: str, ticket_data: Optional[Dict], sub_sub_kwargs: Ac
     if clb:
         kwargs = {
             "name_service_operation_type": "clb_register_part_target",
-            "creator": sub_sub_get_kwargs.payload["creator"],
+            "creator": sub_sub_get_kwargs.payload["created_by"],
             "cluster_id": cluster_id,
             "ips": ["{}:{}".format(node["ip"], str(sub_sub_get_kwargs.db_instance["port"]))],
         }
@@ -231,7 +231,7 @@ def mongos_autofix(root_id: str, ticket_data: Optional[Dict], sub_sub_kwargs: Ac
     # 老实例提下架单
     kwargs = {
         "infos": sub_sub_get_kwargs.payload["nodes"],
-        "creator": sub_sub_get_kwargs.payload["creator"],
+        "creator": sub_sub_get_kwargs.payload["created_by"],
         "bk_biz_id": sub_sub_get_kwargs.payload["bk_biz_id"],
     }
     sub_sub_pipeline.add_act(

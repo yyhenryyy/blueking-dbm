@@ -158,7 +158,7 @@ def mongod_autofix(
     # 老实例提下架单
     kwargs = {
         "infos": sub_sub_get_kwargs.payload["nodes"],
-        "creator": sub_sub_get_kwargs.payload["creator"],
+        "creator": sub_sub_get_kwargs.payload["created_by"],
         "bk_biz_id": sub_sub_get_kwargs.payload["bk_biz_id"],
     }
     sub_sub_pipeline.add_act(
