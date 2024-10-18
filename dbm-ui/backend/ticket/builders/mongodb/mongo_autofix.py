@@ -42,6 +42,7 @@ class MongoDBAutofixDetailSerializer(BaseMongoDBOperateDetailSerializer):
     ip_source = serializers.ChoiceField(
         help_text=_("主机来源"), choices=IpSource.get_choices(), default=IpSource.RESOURCE_POOL
     )
+    bk_biz_id = serializers.IntegerField(help_text=_("业务ID"))
     infos = serializers.ListSerializer(help_text=_("mongo自愈申请信息"), child=AutofixDetailSerializer())
 
 

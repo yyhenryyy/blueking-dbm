@@ -78,6 +78,7 @@ def mongo_create_ticket(cluster: RedisAutofixCore, cluster_ids: list, mongos_lis
         cluster_type = mongod_list[0]["cluster_type"]
     # 单据信息
     details = {
+        "bk_biz_id": cluster.bk_biz_id,
         "ip_source": IpSource.RESOURCE_POOL.value,
         "infos": [
             {
