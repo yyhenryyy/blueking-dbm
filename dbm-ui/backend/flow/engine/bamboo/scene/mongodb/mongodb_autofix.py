@@ -57,12 +57,12 @@ class MongoAutofixFlow(object):
         config = cluster_info.get_config()
         shards = cluster_info.get_shards()
         cluster = {}
-        mongos = []
+        mongos_nodes = []
         mongo_config = []
         mongodb = []
         # 获取mongos参数
         for mongos in self.autofix_info["mongos_list"]:
-            mongos.append(
+            mongos_nodes.append(
                 {
                     "ip": mongos["ip"],
                     "bk_cloud_id": bk_cloud_id,
@@ -124,7 +124,7 @@ class MongoAutofixFlow(object):
                         break
             ip_info["instances"] = instances
             mongodb.append(ip_info)
-        cluster["mongos"] = mongos
+        cluster["mongos"] = mongos_nodes
         cluster["mongo_config"] = mongo_config
         cluster["mongodb"] = mongodb
         flow_parameter["infos"]["MongoShardedCluster"].append(cluster)
