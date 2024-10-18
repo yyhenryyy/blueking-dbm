@@ -75,6 +75,7 @@ class MongoAutofixFlow(object):
                     "instances": [
                         {
                             "cluster_id": cluster_id,
+                            "cluster_name": cluster_info.name,
                             "db_version": cluster_info.major_version,
                             "domain": self.autofix_info["immute_domain"],
                             "port": int(cluster_info.get_mongos()[0].port),
