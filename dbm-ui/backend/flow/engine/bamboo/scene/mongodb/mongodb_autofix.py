@@ -45,6 +45,7 @@ class MongoAutofixFlow(object):
             "bk_app_abbr": AppCache.objects.get(bk_biz_id=bk_biz_id).db_app_abbr,
             "created_by": self.data["created_by"],
             "ticket_type": self.data["ticket_type"],
+            "db_version": "",
             "infos": {"MongoReplicaSet": [], "MongoShardedCluster": []},
         }
 
@@ -56,6 +57,7 @@ class MongoAutofixFlow(object):
         bk_cloud_id = self.autofix_info["bk_cloud_id"]
         cluster_id = self.autofix_info["cluster_ids"][0]
         cluster_info = MongoRepository().fetch_one_cluster(withDomain=False, id=cluster_id)
+        flow_parameter["db_version"] = cluster_info.major_version
         config = cluster_info.get_config()
         shards = cluster_info.get_shards()
         cluster = {}
@@ -143,6 +145,7 @@ class MongoAutofixFlow(object):
             instances = []
             for cluster_id in cluster_ids:
                 cluster_info = MongoRepository().fetch_one_cluster(withDomain=True, id=cluster_id)
+                flow_parameter["db_version"] = cluster_info.major_version
                 for member in cluster_info.get_shards()[0].members:
                     if mongod["ip"] == member.ip:
                         instances.append(
