@@ -66,6 +66,8 @@ class MongoAutofixFlow(object):
         mongodb = []
         # 获取mongos参数
         for mongos in self.autofix_info["mongos_list"]:
+            target = self.autofix_info[mongos["ip"]][0]
+            target["spec_id"] = mongos["spec_id"]
             mongos_nodes.append(
                 {
                     "ip": mongos["ip"],
@@ -73,7 +75,7 @@ class MongoAutofixFlow(object):
                     "spec_id": mongos["spec_id"],
                     "down": True,
                     "spec_config": mongos["spec_config"],
-                    "target": self.autofix_info[mongos["ip"]][0],
+                    "target": target,
                     "instances": [
                         {
                             "cluster_id": cluster_id,
@@ -86,13 +88,15 @@ class MongoAutofixFlow(object):
                 }
             )
         for mongod in self.autofix_info["mongod_list"]:
+            target = self.autofix_info[mongod["ip"]][0]
+            target["spec_id"] = mongod["spec_id"]
             ip_info = {
                 "ip": mongod["ip"],
                 "bk_cloud_id": bk_cloud_id,
                 "spec_id": mongod["spec_id"],
                 "down": True,
                 "spec_config": mongod["spec_config"],
-                "target": self.autofix_info[mongod["ip"]][0],
+                "target": target,
                 "instances": [],
             }
             instances = []
@@ -157,6 +161,8 @@ class MongoAutofixFlow(object):
                                 "port": member.port,
                             }
                         )
+            target = self.autofix_info[mongod["ip"]][0]
+            target["spec_id"] = mongod["spec_id"]
             flow_parameter["infos"]["MongoReplicaSet"].append(
                 {
                     "ip": mongod["ip"],
@@ -164,7 +170,7 @@ class MongoAutofixFlow(object):
                     "spec_id": mongod["spec_id"],
                     "down": True,
                     "spec_config": mongod["spec_config"],
-                    "target": self.autofix_info[mongod["ip"]][0],
+                    "target": target,
                     "instances": instances,
                 }
             )

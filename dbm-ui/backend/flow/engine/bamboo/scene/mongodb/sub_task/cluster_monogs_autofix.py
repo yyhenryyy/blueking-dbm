@@ -175,8 +175,6 @@ def mongos_autofix(root_id: str, ticket_data: Optional[Dict], sub_sub_kwargs: Ac
     cluster_mongos = {}
     cluster_mongos["mongos"] = [info]
     cluster_mongos["db_type"] = "mongos"
-    print("="*100)
-    print(cluster_mongos)
     kwargs = sub_sub_get_kwargs.get_change_meta_replace_kwargs(info=cluster_mongos, instance={})
     sub_sub_pipeline.add_act(
         act_name=_("MongoDB-mongos修改meta"), act_component_code=CMRMongoDBMetaComponent.code, kwargs=kwargs
