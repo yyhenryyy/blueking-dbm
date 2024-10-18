@@ -14,6 +14,7 @@ from typing import Dict, Optional
 from backend.db_meta.enums import ClusterType
 from backend.flow.utils.mongodb.mongodb_repo import MongoRepository
 
+from . import mongodb_cluster_autofix
 from . import mongodb_replace
 
 logger = logging.getLogger("flow")
@@ -31,11 +32,12 @@ class MongoAutofixFlow(object):
 
         self.root_id = root_id
         self.data = data
+        self.autofix_info = self.data["infos"][0]
 
     def get_public_data(self) -> Dict:
         """参数公共部分"""
 
-        bk_biz_id = self.data["infos"]["bk_biz_id"]
+        bk_biz_id = self.autofix_info["bk_biz_id"]
         return {
             "bk_biz_id": bk_biz_id,
             "uid": self.data["uid"],
@@ -48,8 +50,9 @@ class MongoAutofixFlow(object):
         """分片集群获取参数"""
 
         flow_parameter = self.get_public_data()
-        bk_cloud_id = self.data["infos"]["bk_cloud_id"]
-        cluster_id = self.data["infos"]["cluster_ids"][0]
+
+        bk_cloud_id = self.autofix_info["bk_cloud_id"]
+        cluster_id = self.autofix_info["cluster_ids"][0]
         cluster_info = MongoRepository().fetch_one_cluster(withDomain=False, id=cluster_id)
         config = cluster_info.get_config()
         shards = cluster_info.get_shards()
@@ -58,7 +61,7 @@ class MongoAutofixFlow(object):
         mongo_config = []
         mongodb = []
         # 获取mongos参数
-        for mongos in self.data["infos"]["mongos_list"]:
+        for mongos in self.autofix_info["mongos_list"]:
             mongos.append(
                 {
                     "ip": mongos["ip"],
@@ -66,25 +69,25 @@ class MongoAutofixFlow(object):
                     "spec_id": mongos["spec_id"],
                     "down": True,
                     "spec_config": mongos["spec_config"],
-                    "target": self.data["infos"][mongos["ip"]],
+                    "target": self.autofix_info[mongos["ip"]],
                     "instances": [
                         {
                             "cluster_id": cluster_id,
                             "db_version": cluster_info.major_version,
-                            "domain": self.data["infos"]["immute_domain"],
+                            "domain": self.autofix_info["immute_domain"],
                             "port": int(cluster_info.get_mongos()[0].port),
                         }
                     ],
                 }
             )
-        for mongod in self.data["infos"]["mongod_list"]:
+        for mongod in self.autofix_info["mongod_list"]:
             ip_info = {
                 "ip": mongod["ip"],
                 "bk_cloud_id": bk_cloud_id,
                 "spec_id": mongod["spec_id"],
                 "down": True,
                 "spec_config": mongod["spec_config"],
-                "target": self.data["infos"][mongod["ip"]],
+                "target": self.autofix_info[mongod["ip"]],
                 "instances": [],
             }
             instances = []
@@ -131,9 +134,9 @@ class MongoAutofixFlow(object):
         """副本集获取参数"""
 
         flow_parameter = self.get_public_data()
-        bk_cloud_id = self.data["infos"]["bk_cloud_id"]
-        cluster_ids = self.data["infos"]["cluster_ids"]
-        for mongod in self.data["infos"]["mongod_list"]:
+        bk_cloud_id = self.autofix_info["bk_cloud_id"]
+        cluster_ids = self.autofix_info["cluster_ids"]
+        for mongod in self.autofix_info["mongod_list"]:
             instances = []
             for cluster_id in cluster_ids:
                 cluster_info = MongoRepository().fetch_one_cluster(withDomain=True, id=cluster_id)
@@ -155,7 +158,7 @@ class MongoAutofixFlow(object):
                     "spec_id": mongod["spec_id"],
                     "down": True,
                     "spec_config": mongod["spec_config"],
-                    "target": self.data["infos"][mongod["ip"]],
+                    "target": self.autofix_info[mongod["ip"]],
                     "instances": instances,
                 }
             )
@@ -165,8 +168,8 @@ class MongoAutofixFlow(object):
         """进行自愈"""
 
         # 副本集
-        if self.data["infos"]["cluster_type"] == ClusterType.MongoReplicaSet.value:
+        if self.autofix_info["cluster_type"] == ClusterType.MongoReplicaSet.value:
             mongodb_replace.MongoReplaceFlow(self.root_id, self.rs_get_data()).multi_host_replace_flow()
         # 分片集群
-        elif self.data["infos"]["cluster_type"] == ClusterType.MongoShardedCluster.value:
-            mongodb_replace.MongoReplaceFlow(self.root_id, self.shard_get_data()).multi_host_replace_flow()
+        elif self.autofix_info["cluster_type"] == ClusterType.MongoShardedCluster.value:
+            mongodb_cluster_autofix.MongoClusterAutofixFlow(self.root_id, self.shard_get_data()).cluster_autofix_flow()

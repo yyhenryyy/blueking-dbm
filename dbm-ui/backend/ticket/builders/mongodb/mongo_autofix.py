@@ -67,3 +67,5 @@ class MongoDBAutofixFlowBuilder(BaseMongoShardedTicketFlowBuilder):
     inner_flow_builder = MongoDBAutofixFlowParamBuilder
     inner_flow_name = _("MongoDB 故障自愈")
     resource_batch_apply_builder = MongoDBAutofixResourceParamBuilder
+    default_need_itsm = True
+    default_need_manual_confirm = True

@@ -9,15 +9,20 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 import logging
+import datetime
 
+from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 
+from django.utils.crypto import get_random_string
 from backend.configuration.constants import DBType
 from backend.configuration.models.dba import DBAdministrator
 from backend.db_services.dbbase.constants import IpSource
 from backend.db_services.redis.autofix.models import RedisAutofixCore
 from backend.ticket.constants import TicketType
 from backend.ticket.models import Ticket
+from backend.db_services.redis.autofix.enums import AutofixStatus
+from backend.utils.time import datetime2str
 
 logger = logging.getLogger("root")
 
@@ -44,6 +49,7 @@ def get_resource_spec(mongos_list: list, mongod_list: list) -> dict:
                 mongod["ip"]: {
                     "spec_id": mongod["spec_id"],
                     "count": 1,
+                    "spec_config": mongod["spec_config"],
                     "Location_spec": {"city": mongod["city"], "sub_zone_ids": [mongod["bk_sub_zone_id"]]},
                 }
             }
@@ -88,10 +94,15 @@ def mongo_create_ticket(cluster: RedisAutofixCore, cluster_ids: list, mongos_lis
     }
 
     # 创建单据
-    Ticket.create_ticket(
+    ticket = Ticket.create_ticket(
         ticket_type=TicketType.MONGODB_AUTOFIX.value,
         creator=mongodb_dba[0],
         bk_biz_id=cluster.bk_biz_id,
         remark=_("自动发起-自愈任务-{}".format(cluster.immute_domain)),
         details=details,
     )
+    cluster.ticket_id = ticket.id
+    cluster.status_version = get_random_string(12)
+    cluster.deal_status = AutofixStatus.AF_WFLOW.value
+    cluster.update_at = datetime2str(datetime.datetime.now(timezone.utc))
+    cluster.save(update_fields=["ticket_id", "status_version", "deal_status", "update_at"])
