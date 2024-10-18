@@ -73,7 +73,7 @@ class MongoAutofixFlow(object):
                     "spec_id": mongos["spec_id"],
                     "down": True,
                     "spec_config": mongos["spec_config"],
-                    "target": self.autofix_info[mongos["ip"]],
+                    "target": self.autofix_info[mongos["ip"]][0],
                     "instances": [
                         {
                             "cluster_id": cluster_id,
@@ -92,7 +92,7 @@ class MongoAutofixFlow(object):
                 "spec_id": mongod["spec_id"],
                 "down": True,
                 "spec_config": mongod["spec_config"],
-                "target": self.autofix_info[mongod["ip"]],
+                "target": self.autofix_info[mongod["ip"]][0],
                 "instances": [],
             }
             instances = []
@@ -164,7 +164,7 @@ class MongoAutofixFlow(object):
                     "spec_id": mongod["spec_id"],
                     "down": True,
                     "spec_config": mongod["spec_config"],
-                    "target": self.autofix_info[mongod["ip"]],
+                    "target": self.autofix_info[mongod["ip"]][0],
                     "instances": instances,
                 }
             )
