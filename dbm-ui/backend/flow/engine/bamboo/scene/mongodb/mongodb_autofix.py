@@ -13,6 +13,7 @@ from typing import Dict, Optional
 
 from backend.db_meta.enums import ClusterType
 from backend.flow.utils.mongodb.mongodb_repo import MongoRepository
+from backend.db_meta.models import AppCache
 
 from . import mongodb_cluster_autofix
 from . import mongodb_replace
@@ -41,6 +42,7 @@ class MongoAutofixFlow(object):
         return {
             "bk_biz_id": bk_biz_id,
             "uid": self.data["uid"],
+            "bk_app_abbr": AppCache.objects.get(bk_biz_id=bk_biz_id).db_app_abbr,
             "created_by": self.data["created_by"],
             "ticket_type": self.data["ticket_type"],
             "infos": {"MongoReplicaSet": [], "MongoShardedCluster": []},
