@@ -169,12 +169,11 @@ def mongos_autofix(root_id: str, ticket_data: Optional[Dict], sub_sub_kwargs: Ac
     )
 
     # mongos修改db_meta数据
-    info["db_type"] = "mongos"
-    info["created_by"] = sub_sub_get_kwargs.payload.get("created_by")
-    info["bk_biz_id"] = sub_sub_get_kwargs.payload.get("bk_biz_id")
     cluster_mongos = {}
     cluster_mongos["mongos"] = [info]
     cluster_mongos["db_type"] = "mongos"
+    cluster_mongos["created_by"] = sub_sub_get_kwargs.payload.get("created_by")
+    cluster_mongos["bk_biz_id"] = sub_sub_get_kwargs.payload.get("bk_biz_id")
     kwargs = sub_sub_get_kwargs.get_change_meta_replace_kwargs(info=cluster_mongos, instance={})
     sub_sub_pipeline.add_act(
         act_name=_("MongoDB-mongos修改meta"), act_component_code=CMRMongoDBMetaComponent.code, kwargs=kwargs
