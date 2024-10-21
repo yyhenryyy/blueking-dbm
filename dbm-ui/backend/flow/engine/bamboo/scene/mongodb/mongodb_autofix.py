@@ -53,7 +53,6 @@ class MongoAutofixFlow(object):
         """分片集群获取参数"""
 
         flow_parameter = self.get_public_data()
-
         bk_cloud_id = self.autofix_info["bk_cloud_id"]
         cluster_id = self.autofix_info["cluster_ids"][0]
         cluster_info = MongoRepository().fetch_one_cluster(withDomain=False, id=cluster_id)

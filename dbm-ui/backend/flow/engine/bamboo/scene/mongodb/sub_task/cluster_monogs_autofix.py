@@ -69,6 +69,7 @@ def mongos_autofix(root_id: str, ticket_data: Optional[Dict], sub_sub_kwargs: Ac
     sub_sub_get_kwargs.db_release = db_version.split("-")[0]
     # db版本
     sub_sub_get_kwargs.payload["db_version"] = db_version.split("-")[1]
+
     sub_sub_get_kwargs.payload["key_file"] = sub_sub_get_kwargs.get_conf(
         cluster_name=sub_sub_get_kwargs.db_instance["cluster_name"]
     )["key_file"]

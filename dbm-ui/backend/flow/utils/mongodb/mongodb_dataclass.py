@@ -1847,7 +1847,6 @@ class ActKwargs:
         plugin_hosts = []
         plugin_hosts.append({"ip": info["target"]["ip"], "bk_cloud_id": info["target"]["bk_cloud_id"]})
         # 获取参数
-        self.payload["db_version"] = info["instances"][0]["db_version"]
         self.payload["hosts"] = plugin_hosts
         self.payload["plugin_hosts"] = plugin_hosts
 
